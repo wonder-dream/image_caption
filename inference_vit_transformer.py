@@ -8,6 +8,8 @@ import torch
 from PIL import Image
 import matplotlib.pyplot as plt
 from torchvision import transforms
+from tqdm import tqdm
+from eval_metrics import COCOScoreEvaluator  # 导入刚才创建的模块
 
 from vit_transformer_model import build_model
 
@@ -235,6 +237,66 @@ def compare_generation_methods(model, image_path, vocab, device='cuda'):
     print("=" * 80)
 
 
+def evaluate_full_test_set(model, vocab, data_dir='data', device='cuda', batch_size=32):
+    """
+    在整个测试集上进行完整评测 (CIDEr, METEOR, BLEU)
+    """
+    print("\n" + "=" * 80)
+    print("开始全量测试集评测 (CIDEr + METEOR)")
+    print("=" * 80)
+    
+    # 1. 加载测试数据
+    test_data_path = os.path.join(data_dir, 'test_data.json')
+    with open(test_data_path, 'r', encoding='utf-8') as f:
+        test_data = json.load(f)
+    
+    # 准备数据容器
+    ground_truth = {}  # {image_index: [ref1, ref2...]}
+    predictions = {}   # {image_index: [pred]}
+    
+    idx2word = {idx: word for idx, word in vocab.items()}
+    
+    # 2. 准备 Ground Truth (解码 ID 为文本)
+    print("准备 Ground Truth 数据...")
+    for i, (img_path, cap_ids) in enumerate(zip(test_data['IMAGES'], test_data['CAPTIONS'])):
+        # 解码参考文本
+        words = [idx2word[idx] for idx in cap_ids 
+                 if idx not in [vocab['<start>'], vocab['<end>'], vocab['<pad>']]]
+        caption = ' '.join(words)
+        
+        # 使用索引作为 image_id
+        if i not in ground_truth:
+            ground_truth[i] = []
+        ground_truth[i].append(caption)
+
+    # 3. 生成预测结果
+    print(f"正在生成预测结果 (共 {len(test_data['IMAGES'])} 张图片)...")
+    model.eval()
+    
+    # 为了加快速度，我们手动批量处理，而不是一张张调用 generate_caption
+    # 注意：这里为了代码简单，还是复用了 generate_caption，如果太慢可以改写成 batch 处理
+    
+    for i, img_path in enumerate(tqdm(test_data['IMAGES'])):
+        try:
+            # 使用 Greedy 搜索生成，速度最快
+            caption, _ = generate_caption(model, img_path, vocab, device, method='greedy')
+            predictions[i] = [caption]
+        except Exception as e:
+            print(f"生成图片 {img_path} 时出错: {e}")
+            predictions[i] = [""] # 出错填空字符串
+
+    # 4. 调用评测模块
+    evaluator = COCOScoreEvaluator()
+    scores = evaluator.evaluate(ground_truth, predictions)
+    
+    print("\n" + "=" * 80)
+    print("最终评测结果")
+    print("=" * 80)
+    for metric, score in scores.items():
+        print(f"{metric}: {score:.4f}")
+    
+    return scores
+
 def main():
     """主函数"""
     
@@ -247,6 +309,11 @@ def main():
     print("=" * 80)
     
     # 加载模型
+    if not os.path.exists(checkpoint_path):
+        print(f"错误: 找不到模型文件 {checkpoint_path}")
+        print("请先运行 train_vit_transformer.py 进行训练")
+        return
+
     print(f"\n使用设备: {device}")
     print(f"加载模型: {checkpoint_path}")
     model, vocab, config = load_model(checkpoint_path, device)
@@ -284,6 +351,14 @@ def main():
     print("=" * 80)
     evaluate_samples(model, vocab, 'data', num_samples=5, device=device)
     
+    # --- 新增：全量评测 ---
+    # 询问用户是否进行全量评测
+    print("\n是否进行全量评测 (计算 CIDEr/METEOR)? 这可能需要几分钟。")
+    choice = input("输入 'y' 开始评测，其他键跳过: ")
+    
+    if choice.lower() == 'y':
+        evaluate_full_test_set(model, vocab, data_dir='data', device=device)
+
     print("\n" + "=" * 80)
     print("推理测试完成！")
     print("=" * 80)
