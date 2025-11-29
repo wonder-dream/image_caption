@@ -376,7 +376,13 @@ def train(config):
 
     # 在测试集上评估最佳模型
     print("\n在测试集上评估最佳模型...")
-    checkpoint = torch.load(os.path.join(config["checkpoint_dir"], "best_model.pth"))
+    
+    # 修改：添加 weights_only=False 以允许加载包含 numpy 标量的 checkpoint
+    checkpoint = torch.load(
+        os.path.join(config["checkpoint_dir"], "best_model.pth"), 
+        weights_only=False
+    )
+    
     model.load_state_dict(checkpoint["model_state_dict"])
 
     test_loss, test_cider = validate(model, test_loader, criterion, device, vocab)
