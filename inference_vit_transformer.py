@@ -27,7 +27,7 @@ def load_model(checkpoint_path, device='cuda'):
         config: 配置
     """
     # 加载检查点
-    checkpoint = torch.load(checkpoint_path, map_location=device)
+    checkpoint = torch.load(checkpoint_path, map_location=device, weights_only=False)
     config = checkpoint['config']
     
     # 加载词典
@@ -254,7 +254,7 @@ def evaluate_full_test_set(model, vocab, data_dir='data', device='cuda', batch_s
     ground_truth = {}  # {image_index: [ref1, ref2...]}
     predictions = {}   # {image_index: [pred]}
     
-    idx2word = {idx: word for idx, word in vocab.items()}
+    idx2word = {idx: word for word, idx in vocab.items()}
     
     # 2. 准备 Ground Truth (解码 ID 为文本)
     print("准备 Ground Truth 数据...")
