@@ -8,6 +8,7 @@ import torch
 import torch.nn as nn
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
+import matplotlib.pyplot as plt
 
 from eval_metrics import COCOScoreEvaluator
 from grid_transformer_model import build_model
@@ -16,6 +17,7 @@ from deepfashion_dataset import create_data_loaders
 
 class AverageMeter:
     """计算并存储平均值和当前值"""
+
     def __init__(self):
         self.reset()
 
@@ -32,7 +34,135 @@ class AverageMeter:
         self.avg = self.sum / self.count
 
 
-def train_epoch(model, train_loader, criterion, optimizer, epoch, device, writer, global_step):
+class MetricsHistory:
+    """记录训练过程中的所有指标"""
+
+    def __init__(self):
+        self.epochs = []
+        self.train_losses = []
+        self.val_losses = []
+        self.cider_scores = []
+        self.meteor_scores = []
+        self.rouge_l_scores = []
+        self.spice_scores = []
+
+    def add(self, epoch, train_loss, val_loss, scores):
+        self.epochs.append(epoch)
+        self.train_losses.append(train_loss)
+        self.val_losses.append(val_loss)
+        self.cider_scores.append(scores.get("CIDEr", 0.0))
+        self.meteor_scores.append(scores.get("METEOR", 0.0))
+        self.rouge_l_scores.append(scores.get("ROUGE_L", 0.0))
+        self.spice_scores.append(scores.get("SPICE", 0.0))
+
+    def plot_and_save(self, save_path):
+        """绘制并保存折线图"""
+        fig, axes = plt.subplots(2, 3, figsize=(15, 10))
+        fig.suptitle("Grid-Transformer Training Metrics", fontsize=16)
+
+        # 1. 训练损失
+        axes[0, 0].plot(
+            self.epochs, self.train_losses, "b-", marker="o", label="Train Loss"
+        )
+        axes[0, 0].set_xlabel("Epoch")
+        axes[0, 0].set_ylabel("Loss")
+        axes[0, 0].set_title("Training Loss")
+        axes[0, 0].legend()
+        axes[0, 0].grid(True)
+
+        # 2. 验证损失
+        axes[0, 1].plot(
+            self.epochs, self.val_losses, "r-", marker="o", label="Val Loss"
+        )
+        axes[0, 1].set_xlabel("Epoch")
+        axes[0, 1].set_ylabel("Loss")
+        axes[0, 1].set_title("Validation Loss")
+        axes[0, 1].legend()
+        axes[0, 1].grid(True)
+
+        # 3. CIDEr
+        axes[0, 2].plot(self.epochs, self.cider_scores, "g-", marker="o", label="CIDEr")
+        axes[0, 2].set_xlabel("Epoch")
+        axes[0, 2].set_ylabel("Score")
+        axes[0, 2].set_title("CIDEr Score")
+        axes[0, 2].legend()
+        axes[0, 2].grid(True)
+
+        # 4. METEOR
+        axes[1, 0].plot(
+            self.epochs, self.meteor_scores, "m-", marker="o", label="METEOR"
+        )
+        axes[1, 0].set_xlabel("Epoch")
+        axes[1, 0].set_ylabel("Score")
+        axes[1, 0].set_title("METEOR Score")
+        axes[1, 0].legend()
+        axes[1, 0].grid(True)
+
+        # 5. ROUGE-L
+        axes[1, 1].plot(
+            self.epochs, self.rouge_l_scores, "c-", marker="o", label="ROUGE-L"
+        )
+        axes[1, 1].set_xlabel("Epoch")
+        axes[1, 1].set_ylabel("Score")
+        axes[1, 1].set_title("ROUGE-L Score")
+        axes[1, 1].legend()
+        axes[1, 1].grid(True)
+
+        # 6. SPICE
+        axes[1, 2].plot(self.epochs, self.spice_scores, "y-", marker="o", label="SPICE")
+        axes[1, 2].set_xlabel("Epoch")
+        axes[1, 2].set_ylabel("Score")
+        axes[1, 2].set_title("SPICE Score")
+        axes[1, 2].legend()
+        axes[1, 2].grid(True)
+
+        plt.tight_layout()
+        plt.savefig(save_path, dpi=150)
+        plt.close()
+        print(f"✓ 训练曲线已保存到: {save_path}")
+
+    def plot_all_metrics_combined(self, save_path):
+        """将所有评测指标绘制在同一张图上"""
+        plt.figure(figsize=(12, 6))
+
+        plt.plot(
+            self.epochs, self.cider_scores, "g-", marker="o", label="CIDEr", linewidth=2
+        )
+        plt.plot(
+            self.epochs,
+            self.meteor_scores,
+            "m-",
+            marker="s",
+            label="METEOR",
+            linewidth=2,
+        )
+        plt.plot(
+            self.epochs,
+            self.rouge_l_scores,
+            "c-",
+            marker="^",
+            label="ROUGE-L",
+            linewidth=2,
+        )
+        plt.plot(
+            self.epochs, self.spice_scores, "y-", marker="d", label="SPICE", linewidth=2
+        )
+
+        plt.xlabel("Epoch", fontsize=12)
+        plt.ylabel("Score", fontsize=12)
+        plt.title("Grid-Transformer Evaluation Metrics", fontsize=14)
+        plt.legend(loc="best", fontsize=10)
+        plt.grid(True, alpha=0.3)
+
+        plt.tight_layout()
+        plt.savefig(save_path, dpi=150)
+        plt.close()
+        print(f"✓ 综合评测曲线已保存到: {save_path}")
+
+
+def train_epoch(
+    model, train_loader, criterion, optimizer, epoch, device, writer, global_step
+):
     """训练一个epoch"""
     model.train()
     losses = AverageMeter()
@@ -66,7 +196,7 @@ def train_epoch(model, train_loader, criterion, optimizer, epoch, device, writer
     return losses.avg
 
 
-def validate(model, val_loader, criterion, device, vocab):
+def validate(model, val_loader, criterion, device, vocab, fast_mode=True):
     """验证模型性能"""
     model.eval()
     losses = AverageMeter()
@@ -93,16 +223,20 @@ def validate(model, val_loader, criterion, device, vocab):
             # 2. 生成描述
             start_idx = i * val_loader.batch_size
             generated_captions = model.generate(
-                imgs, vocab['<start>'], vocab['<end>'], max_len=50, method='greedy'
+                imgs, vocab["<start>"], vocab["<end>"], max_len=50, method="greedy"
             )
 
             # 收集结果
             for j in range(imgs.size(0)):
                 img_id = start_idx + j
-                
+
                 # Ground Truth
                 ref_ids = caps[j].cpu().numpy()
-                ref_words = [idx2word[idx] for idx in ref_ids if idx not in [vocab["<start>"], vocab["<end>"], vocab["<pad>"]]]
+                ref_words = [
+                    idx2word[idx]
+                    for idx in ref_ids
+                    if idx not in [vocab["<start>"], vocab["<end>"], vocab["<pad>"]]
+                ]
                 gts[img_id] = [" ".join(ref_words)]
 
                 # Prediction
@@ -116,12 +250,17 @@ def validate(model, val_loader, criterion, device, vocab):
                 res[img_id] = [" ".join(pred_words)]
 
     print("计算评测分数...")
-    scores = evaluator.evaluate(gts, res, fast_mode=True)
-    cider_score = scores.get("CIDEr", 0.0)
-    bleu4_score = scores.get("Bleu_4", 0.0)
+    scores = evaluator.evaluate(gts, res, fast_mode=fast_mode)
 
-    print(f"Validation Loss: {losses.avg:.4f}, CIDEr: {cider_score:.4f}, BLEU-4: {bleu4_score:.4f}")
-    return losses.avg, cider_score
+    print(f"\n{'='*60}")
+    print(f"Validation Loss: {losses.avg:.4f}")
+    print(f"CIDEr:   {scores.get('CIDEr', 0.0):.4f}")
+    print(f"METEOR:  {scores.get('METEOR', 0.0):.4f}")
+    print(f"ROUGE-L: {scores.get('ROUGE_L', 0.0):.4f}")
+    print(f"SPICE:   {scores.get('SPICE', 0.0):.4f}")
+    print(f"{'='*60}\n")
+
+    return losses.avg, scores  # 修改：返回 scores 而不是单个 cider
 
 
 def train(config):
@@ -153,70 +292,156 @@ def train(config):
     print(f"可训练参数量: {trainable_params / 1e6:.2f}M")
 
     if config.get("finetune_encoder_after_epoch", -1) >= 0:
-        print(f"将在第 {config['finetune_encoder_after_epoch']} 个epoch后开始微调CNN编码器")
+        print(
+            f"将在第 {config['finetune_encoder_after_epoch']} 个epoch后开始微调CNN编码器"
+        )
 
     criterion = nn.CrossEntropyLoss(ignore_index=vocab["<pad>"])
     optimizer = torch.optim.Adam(model.parameters(), lr=config["learning_rate"])
-    
+
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+        optimizer,
+        mode="max",
+        factor=0.5,
+        patience=3,
+    )
+
     writer = SummaryWriter(log_dir=config.get("log_dir", "runs/grid_transformer"))
     print(f"TensorBoard日志目录: {writer.log_dir}")
 
+    # 初始化指标记录器
+    metrics_history = MetricsHistory()
+
     print("\n开始训练...")
+    print("=" * 70)
+
     best_cider = 0.0
     global_step = [0]
 
     for epoch in range(1, config["num_epochs"] + 1):
         print(f"\nEpoch {epoch}/{config['num_epochs']}")
-        
+        print("-" * 70)
+
         if epoch == config.get("finetune_encoder_after_epoch", -1):
             print("开始微调CNN编码器...")
             model.encoder.set_cnn_trainable(True)
-            optimizer = torch.optim.Adam([
-                {'params': model.encoder.cnn.parameters(), 'lr': config["learning_rate"] * 0.1},
-                {'params': model.encoder.projection.parameters()},
-                {'params': model.encoder.transformer_encoder.parameters()},
-                {'params': model.decoder.parameters()}
-            ], lr=config["learning_rate"])
-            print(f"可训练参数量更新为: {sum(p.numel() for p in model.parameters() if p.requires_grad) / 1e6:.2f}M")
+            optimizer = torch.optim.Adam(
+                [
+                    {
+                        "params": model.encoder.cnn.parameters(),
+                        "lr": config["learning_rate"] * 0.1,
+                    },
+                    {"params": model.encoder.projection.parameters()},
+                    {"params": model.encoder.transformer_encoder.parameters()},
+                    {"params": model.decoder.parameters()},
+                ],
+                lr=config["learning_rate"],
+            )
+            print(
+                f"可训练参数量更新为: {sum(p.numel() for p in model.parameters() if p.requires_grad) / 1e6:.2f}M"
+            )
 
-        train_loss = train_epoch(model, train_loader, criterion, optimizer, epoch, device, writer, global_step)
+        train_loss = train_epoch(
+            model,
+            train_loader,
+            criterion,
+            optimizer,
+            epoch,
+            device,
+            writer,
+            global_step,
+        )
         print(f"训练损失: {train_loss:.4f}")
 
         if epoch % config.get("eval_every", 1) == 0:
-            val_loss, cider = validate(model, val_loader, criterion, device, vocab)
+            print("\n验证中...")
+            val_loss, scores = validate(
+                model, val_loader, criterion, device, vocab, fast_mode=True
+            )
+
+            cider = scores.get("CIDEr", 0.0)
+
+            # 记录指标
+            metrics_history.add(epoch, train_loss, val_loss, scores)
+
+            # 记录到 TensorBoard
             writer.add_scalar("Val/Loss", val_loss, epoch)
-            writer.add_scalar("Val/CIDEr", cider, epoch)
+            writer.add_scalar("Val/CIDEr", scores.get("CIDEr", 0.0), epoch)
+            writer.add_scalar("Val/METEOR", scores.get("METEOR", 0.0), epoch)
+            writer.add_scalar("Val/ROUGE_L", scores.get("ROUGE_L", 0.0), epoch)
+            writer.add_scalar("Val/SPICE", scores.get("SPICE", 0.0), epoch)
+
+            # 学习率调度
+            scheduler.step(cider)
 
             if cider > best_cider:
                 best_cider = cider
                 os.makedirs(config["checkpoint_dir"], exist_ok=True)
                 save_path = os.path.join(config["checkpoint_dir"], "best_model.pth")
-                torch.save({
-                    "epoch": epoch,
-                    "model_state_dict": model.state_dict(),
-                    "optimizer_state_dict": optimizer.state_dict(),
-                    "cider": cider,
-                    "config": config,
-                }, save_path)
+                torch.save(
+                    {
+                        "epoch": epoch,
+                        "model_state_dict": model.state_dict(),
+                        "optimizer_state_dict": optimizer.state_dict(),
+                        "scores": scores,
+                        "config": config,
+                    },
+                    save_path,
+                )
                 print(f"保存最佳模型! CIDEr: {best_cider:.4f}")
 
         if epoch % config.get("save_every", 5) == 0:
-            save_path = os.path.join(config["checkpoint_dir"], f"checkpoint_epoch_{epoch}.pth")
+            save_path = os.path.join(
+                config["checkpoint_dir"], f"checkpoint_epoch_{epoch}.pth"
+            )
             os.makedirs(config["checkpoint_dir"], exist_ok=True)
-            torch.save({
-                "epoch": epoch,
-                "model_state_dict": model.state_dict(),
-            }, save_path)
+            torch.save(
+                {
+                    "epoch": epoch,
+                    "model_state_dict": model.state_dict(),
+                },
+                save_path,
+            )
             print(f"✓ 保存检查点到 {save_path}")
 
-    print(f"\n训练完成！最佳CIDEr: {best_cider:.4f}")
+        print("-" * 70)
+
+    print("\n训练完成！")
+    print(f"最佳CIDEr: {best_cider:.4f}")
+
+    # 保存训练曲线图
+    os.makedirs(config["checkpoint_dir"], exist_ok=True)
+    metrics_history.plot_and_save(
+        os.path.join(config["checkpoint_dir"], "training_metrics.png")
+    )
+    metrics_history.plot_all_metrics_combined(
+        os.path.join(config["checkpoint_dir"], "evaluation_metrics_combined.png")
+    )
+
     writer.close()
 
-    print("\n在测试集上评估最佳模型...")
-    checkpoint = torch.load(os.path.join(config["checkpoint_dir"], "best_model.pth"))
+    # 在测试集上评估最佳模型 (完整模式，包含 SPICE)
+    print("\n在测试集上评估最佳模型 (完整评测，包含 SPICE)...")
+    checkpoint = torch.load(
+        os.path.join(config["checkpoint_dir"], "best_model.pth"), weights_only=False
+    )
     model.load_state_dict(checkpoint["model_state_dict"])
-    test_loss, test_cider = validate(model, test_loader, criterion, device, vocab)
-    print(f"测试集损失: {test_loss:.4f}, 测试集CIDEr: {test_cider:.4f}")
+
+    test_loss, test_scores = validate(
+        model, test_loader, criterion, device, vocab, fast_mode=False
+    )
+
+    print("\n" + "=" * 70)
+    print("最终测试集评测结果:")
+    print("=" * 70)
+    print(f"测试集损失:  {test_loss:.4f}")
+    print(f"CIDEr:       {test_scores.get('CIDEr', 0.0):.4f}")
+    print(f"METEOR:      {test_scores.get('METEOR', 0.0):.4f}")
+    print(f"ROUGE-L:     {test_scores.get('ROUGE_L', 0.0):.4f}")
+    print(f"SPICE:       {test_scores.get('SPICE', 0.0):.4f}")
+    print("=" * 70)
+
+    return model
 
 
 if __name__ == "__main__":
@@ -225,7 +450,7 @@ if __name__ == "__main__":
         "data_dir": "data",
         "vocab_path": "data/vocab.json",
         "batch_size": 32,
-        "num_workers": 0, # Windows下设为0
+        "num_workers": 8,  # Linux下可以设为8
         # 模型 (Grid-Transformer)
         "d_model": 512,
         "nhead": 8,
@@ -238,7 +463,7 @@ if __name__ == "__main__":
         # 训练
         "num_epochs": 30,
         "learning_rate": 1e-4,
-        "finetune_encoder_after_epoch": 5, # 第5个epoch后微调CNN
+        "finetune_encoder_after_epoch": 5,
         # 评估和保存
         "eval_every": 1,
         "save_every": 5,
