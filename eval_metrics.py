@@ -47,20 +47,19 @@ class FixedMeteor(Meteor):
 
 class COCOScoreEvaluator:
     """
-    封装 COCO 评测标准 (METEOR, ROUGE-L, CIDEr, SPICE)
+    封装 COCO 评测标准 (METEOR, ROUGE-L, CIDEr)
     """
 
     def __init__(self):
         pass
 
-    def evaluate(self, ground_truth, predictions, fast_mode=False):
+    def evaluate(self, ground_truth, predictions):
         """
-        计算评测指标
+        计算评测指标 (CIDEr, METEOR, ROUGE-L)
 
         参数:
             ground_truth: dict, 格式 {image_id: ["caption 1", "caption 2", ...]}
             predictions: dict, 格式 {image_id: ["generated caption"]}
-            fast_mode: bool, 是否启用快速模式 (只计算 CIDEr 和 METEOR，跳过 SPICE)
 
         返回:
             scores: dict, 各项指标的分数
@@ -89,110 +88,55 @@ class COCOScoreEvaluator:
             coco_eval = COCOEvalCap(coco, coco_result)
             coco_eval.params["image_id"] = coco_result.getImgIds()
 
-            if fast_mode:
-                # 快速模式: 只计算 CIDEr, METEOR, ROUGE-L (跳过耗时的 SPICE)
-                print("快速评测模式: 计算 CIDEr, METEOR, ROUGE-L (跳过 SPICE)...")
+            # 4. 计算指标
+            print("开始评测: 计算 CIDEr, METEOR, ROUGE-L...")
 
-                from pycocoevalcap.tokenizer.ptbtokenizer import PTBTokenizer
+            from pycocoevalcap.tokenizer.ptbtokenizer import PTBTokenizer
 
-                tokenizer = PTBTokenizer()
-                coco_eval.imgToAnns = {
-                    imgId: coco_eval.coco.imgToAnns[imgId]
-                    for imgId in coco_eval.params["image_id"]
-                }
-                coco_eval.gts = tokenizer.tokenize(coco_eval.imgToAnns)
-                coco_eval.res = tokenizer.tokenize(coco_eval.cocoRes.imgToAnns)
+            tokenizer = PTBTokenizer()
+            coco_eval.imgToAnns = {
+                imgId: coco_eval.coco.imgToAnns[imgId]
+                for imgId in coco_eval.params["image_id"]
+            }
+            coco_eval.gts = tokenizer.tokenize(coco_eval.imgToAnns)
+            coco_eval.res = tokenizer.tokenize(coco_eval.cocoRes.imgToAnns)
 
-                # 手动调用需要的 scorer (不包括 SPICE，因为太慢)
-                from pycocoevalcap.cider.cider import Cider
-                from pycocoevalcap.rouge.rouge import Rouge
+            # 手动调用需要的 scorer
+            from pycocoevalcap.cider.cider import Cider
+            from pycocoevalcap.rouge.rouge import Rouge
 
-                scorers = [
-                    (Cider(), "CIDEr"),
-                    (FixedMeteor(), "METEOR"),
-                    (Rouge(), "ROUGE_L"),
-                ]
+            scorers = [
+                (Cider(), "CIDEr"),
+                (FixedMeteor(), "METEOR"),
+                (Rouge(), "ROUGE_L"),
+            ]
 
-                eval_res = {}
-                for scorer, method in scorers:
-                    try:
-                        score, scores = scorer.compute_score(
-                            coco_eval.gts, coco_eval.res
-                        )
-                        eval_res[method] = score
-                        print(f"  {method}: {score:.4f}")
-                    except Exception as e:
-                        print(f"  {method} 计算失败: {e}")
-                        # 尝试读取 stderr
-                        if hasattr(scorer, 'meteor_p') and scorer.meteor_p.stderr:
-                            try:
-                                # 使用 select 检查是否有数据可读，避免阻塞
-                                import select
-                                if select.select([scorer.meteor_p.stderr], [], [], 0.1)[0]:
-                                    err = scorer.meteor_p.stderr.read()
-                                    if err:
-                                        print(f"  {method} stderr: {err.decode('utf-8', errors='ignore')}")
-                            except Exception as err_read_e:
-                                print(f"  无法读取 stderr: {err_read_e}")
+            eval_res = {}
+            for scorer, method in scorers:
+                try:
+                    print(f"  正在计算 {method}...")
+                    score, scores = scorer.compute_score(
+                        coco_eval.gts, coco_eval.res
+                    )
+                    eval_res[method] = score
+                    print(f"  {method}: {score:.4f}")
+                except Exception as e:
+                    print(f"  {method} 计算失败: {e}")
+                    # 尝试读取 stderr
+                    if hasattr(scorer, 'meteor_p') and scorer.meteor_p.stderr:
+                        try:
+                            # 使用 select 检查是否有数据可读，避免阻塞
+                            import select
+                            if select.select([scorer.meteor_p.stderr], [], [], 0.1)[0]:
+                                err = scorer.meteor_p.stderr.read()
+                                if err:
+                                    print(f"  {method} stderr: {err.decode('utf-8', errors='ignore')}")
+                        except Exception as err_read_e:
+                            print(f"  无法读取 stderr: {err_read_e}")
+                    
+                    eval_res[method] = 0.0
 
-                        eval_res[method] = 0.0
-
-                # 快速模式下 SPICE 设为 0
-                eval_res["SPICE"] = 0.0
-                print("  SPICE: 跳过 (快速模式)")
-
-                coco_eval.eval = eval_res
-            else:
-                # 完整模式: 计算所有四个指标 (METEOR, ROUGE-L, CIDEr, SPICE)
-                print("完整评测模式: 计算 METEOR, ROUGE-L, CIDEr, SPICE...")
-
-                from pycocoevalcap.tokenizer.ptbtokenizer import PTBTokenizer
-
-                tokenizer = PTBTokenizer()
-                coco_eval.imgToAnns = {
-                    imgId: coco_eval.coco.imgToAnns[imgId]
-                    for imgId in coco_eval.params["image_id"]
-                }
-                coco_eval.gts = tokenizer.tokenize(coco_eval.imgToAnns)
-                coco_eval.res = tokenizer.tokenize(coco_eval.cocoRes.imgToAnns)
-
-                from pycocoevalcap.cider.cider import Cider
-                from pycocoevalcap.rouge.rouge import Rouge
-                from pycocoevalcap.spice.spice import Spice
-
-                scorers = [
-                    (Cider(), "CIDEr"),
-                    (FixedMeteor(), "METEOR"),
-                    (Rouge(), "ROUGE_L"),
-                    (Spice(), "SPICE"),
-                ]
-
-                eval_res = {}
-                for scorer, method in scorers:
-                    try:
-                        print(f"  正在计算 {method}...")
-                        score, scores = scorer.compute_score(
-                            coco_eval.gts, coco_eval.res
-                        )
-                        eval_res[method] = score
-                        print(f"  {method}: {score:.4f}")
-                    except Exception as e:
-                        print(f"  {method} 计算失败: {e}")
-                        # 尝试读取 stderr
-                        if hasattr(scorer, 'meteor_p') and scorer.meteor_p.stderr:
-                            try:
-                                # 使用 select 检查是否有数据可读，避免阻塞
-                                import select
-                                if select.select([scorer.meteor_p.stderr], [], [], 0.1)[0]:
-                                    err = scorer.meteor_p.stderr.read()
-                                    if err:
-                                        print(f"  {method} stderr: {err.decode('utf-8', errors='ignore')}")
-                            except Exception as err_read_e:
-                                print(f"  无法读取 stderr: {err_read_e}")
-                        
-                        eval_res[method] = 0.0
-
-                coco_eval.eval = eval_res
+            coco_eval.eval = eval_res
 
             # 5. 提取结果
             scores = coco_eval.eval
@@ -203,7 +147,7 @@ class COCOScoreEvaluator:
             import traceback
 
             traceback.print_exc()
-            return {"CIDEr": 0.0, "METEOR": 0.0, "ROUGE_L": 0.0, "SPICE": 0.0}
+            return {"CIDEr": 0.0, "METEOR": 0.0, "ROUGE_L": 0.0}
         finally:
             # 清理临时文件
             if os.path.exists(coco_gt_path):
@@ -246,10 +190,6 @@ if __name__ == "__main__":
     pred = {1: ["red dress"], 2: ["blue pants"]}
 
     evaluator = COCOScoreEvaluator()
-    print("测试快速模式:")
-    scores = evaluator.evaluate(gt, pred, fast_mode=True)
+    print("测试评测:")
+    scores = evaluator.evaluate(gt, pred)
     print("测试分数:", scores)
-
-    print("\n测试完整模式 (包含 SPICE):")
-    scores_full = evaluator.evaluate(gt, pred, fast_mode=False)
-    print("完整模式分数:", scores_full)
