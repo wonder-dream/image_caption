@@ -1,9 +1,31 @@
 import json
 import os
 import tempfile
+import subprocess
+import threading
 from pycocotools.coco import COCO
 from pycocoevalcap.eval import COCOEvalCap
+from pycocoevalcap.meteor.meteor import Meteor
 
+class FixedMeteor(Meteor):
+    """
+    修复版 Meteor 类，解决了 Java 命令参数顺序错误导致的 Broken pipe 问题。
+    """
+    def __init__(self):
+        # 获取原始 meteor 模块的路径以找到 jar 文件
+        import pycocoevalcap.meteor.meteor as original_meteor_module
+        meteor_dir = os.path.dirname(os.path.abspath(original_meteor_module.__file__))
+        meteor_jar = 'meteor-1.5.jar'
+        
+        # 修复: 将 -Xmx2G 放在 -jar 之前
+        self.meteor_cmd = ['java', '-Xmx2G', '-jar', meteor_jar, \
+                '-', '-', '-stdio', '-l', 'en', '-norm']
+        self.meteor_p = subprocess.Popen(self.meteor_cmd, \
+                cwd=meteor_dir, \
+                stdin=subprocess.PIPE, \
+                stdout=subprocess.PIPE, \
+                stderr=subprocess.PIPE)
+        self.lock = threading.Lock()
 
 class COCOScoreEvaluator:
     """
@@ -65,12 +87,11 @@ class COCOScoreEvaluator:
 
                 # 手动调用需要的 scorer (不包括 SPICE，因为太慢)
                 from pycocoevalcap.cider.cider import Cider
-                from pycocoevalcap.meteor.meteor import Meteor
                 from pycocoevalcap.rouge.rouge import Rouge
 
                 scorers = [
                     (Cider(), "CIDEr"),
-                    (Meteor(), "METEOR"),
+                    (FixedMeteor(), "METEOR"),
                     (Rouge(), "ROUGE_L"),
                 ]
 
@@ -106,13 +127,12 @@ class COCOScoreEvaluator:
                 coco_eval.res = tokenizer.tokenize(coco_eval.cocoRes.imgToAnns)
 
                 from pycocoevalcap.cider.cider import Cider
-                from pycocoevalcap.meteor.meteor import Meteor
                 from pycocoevalcap.rouge.rouge import Rouge
                 from pycocoevalcap.spice.spice import Spice
 
                 scorers = [
                     (Cider(), "CIDEr"),
-                    (Meteor(), "METEOR"),
+                    (FixedMeteor(), "METEOR"),
                     (Rouge(), "ROUGE_L"),
                     (Spice(), "SPICE"),
                 ]
@@ -187,3 +207,7 @@ if __name__ == "__main__":
     print("测试快速模式:")
     scores = evaluator.evaluate(gt, pred, fast_mode=True)
     print("测试分数:", scores)
+
+    print("\n测试完整模式 (包含 SPICE):")
+    scores_full = evaluator.evaluate(gt, pred, fast_mode=False)
+    print("完整模式分数:", scores_full)
