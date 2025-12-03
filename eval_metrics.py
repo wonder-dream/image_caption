@@ -17,8 +17,8 @@ class FixedMeteor(Meteor):
         meteor_dir = os.path.dirname(os.path.abspath(original_meteor_module.__file__))
         meteor_jar = 'meteor-1.5.jar'
         
-        # 修复: 将 -Xmx2G 放在 -jar 之前
-        self.meteor_cmd = ['java', '-Xmx2G', '-jar', meteor_jar, \
+        # 修复: 将 -Xmx2G 放在 -jar 之前，并增加内存到 4G
+        self.meteor_cmd = ['java', '-Xmx4G', '-jar', meteor_jar, \
                 '-', '-', '-stdio', '-l', 'en', '-norm']
         self.meteor_p = subprocess.Popen(self.meteor_cmd, \
                 cwd=meteor_dir, \
@@ -26,6 +26,24 @@ class FixedMeteor(Meteor):
                 stdout=subprocess.PIPE, \
                 stderr=subprocess.PIPE)
         self.lock = threading.Lock()
+
+    def __del__(self):
+        # 重写 __del__ 以便在销毁时正确关闭，并打印可能的错误
+        if hasattr(self, 'meteor_p') and self.meteor_p:
+            self.lock.acquire()
+            try:
+                if self.meteor_p.stdin:
+                    self.meteor_p.stdin.close()
+                if self.meteor_p.stderr:
+                    err = self.meteor_p.stderr.read()
+                    if err:
+                        print(f"METEOR 进程 stderr 输出:\n{err.decode('utf-8', errors='ignore')}")
+                self.meteor_p.kill()
+                self.meteor_p.wait()
+            except Exception:
+                pass
+            finally:
+                self.lock.release()
 
 class COCOScoreEvaluator:
     """
@@ -105,6 +123,18 @@ class COCOScoreEvaluator:
                         print(f"  {method}: {score:.4f}")
                     except Exception as e:
                         print(f"  {method} 计算失败: {e}")
+                        # 尝试读取 stderr
+                        if hasattr(scorer, 'meteor_p') and scorer.meteor_p.stderr:
+                            try:
+                                # 使用 select 检查是否有数据可读，避免阻塞
+                                import select
+                                if select.select([scorer.meteor_p.stderr], [], [], 0.1)[0]:
+                                    err = scorer.meteor_p.stderr.read()
+                                    if err:
+                                        print(f"  {method} stderr: {err.decode('utf-8', errors='ignore')}")
+                            except Exception as err_read_e:
+                                print(f"  无法读取 stderr: {err_read_e}")
+
                         eval_res[method] = 0.0
 
                 # 快速模式下 SPICE 设为 0
@@ -148,6 +178,18 @@ class COCOScoreEvaluator:
                         print(f"  {method}: {score:.4f}")
                     except Exception as e:
                         print(f"  {method} 计算失败: {e}")
+                        # 尝试读取 stderr
+                        if hasattr(scorer, 'meteor_p') and scorer.meteor_p.stderr:
+                            try:
+                                # 使用 select 检查是否有数据可读，避免阻塞
+                                import select
+                                if select.select([scorer.meteor_p.stderr], [], [], 0.1)[0]:
+                                    err = scorer.meteor_p.stderr.read()
+                                    if err:
+                                        print(f"  {method} stderr: {err.decode('utf-8', errors='ignore')}")
+                            except Exception as err_read_e:
+                                print(f"  无法读取 stderr: {err_read_e}")
+                        
                         eval_res[method] = 0.0
 
                 coco_eval.eval = eval_res
