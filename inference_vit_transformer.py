@@ -27,11 +27,20 @@ def load_model(checkpoint_path, device='cuda'):
         config: 配置
     """
     # 加载检查点
-    checkpoint = torch.load(checkpoint_path, map_location=device, weights_only=False)
-    config = checkpoint['config']
+    # 处理 numpy 版本兼容性问题
+    import sys
+    import numpy as np
+    
+    # 临时修复 numpy._core 导入问题（numpy 2.0+ 使用 _core，旧版本使用 core）
+    if not hasattr(np, '_core'):
+        sys.modules['numpy._core'] = np.core
+        sys.modules['numpy._core.multiarray'] = np.core.multiarray
+    
+    checkpoint = torch.load(checkpoint_path, map_location=device)
+    config = checkpoint.get('config', {})  # 兼容旧的checkpoint
     
     # 加载词典
-    with open(config['vocab_path'], 'r', encoding='utf-8') as f:
+    with open(config.get('vocab_path', 'data/vocab.json'), 'r', encoding='utf-8') as f:
         vocab = json.load(f)
     
     # 构建模型
@@ -41,9 +50,11 @@ def load_model(checkpoint_path, device='cuda'):
     model.eval()
     
     print(f"模型加载成功！")
-    print(f"训练轮次: {checkpoint['epoch']}")
+    print(f"训练轮次: {checkpoint.get('epoch', 'N/A')}")
     if 'bleu4' in checkpoint:
         print(f"BLEU-4: {checkpoint['bleu4']:.4f}")
+    if 'cider' in checkpoint:
+        print(f"CIDEr: {checkpoint['cider']:.4f}")
     
     return model, vocab, config
 
