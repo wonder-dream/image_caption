@@ -44,7 +44,6 @@ class MetricsHistory:
         self.cider_scores = []
         self.meteor_scores = []
         self.rouge_l_scores = []
-        self.spice_scores = []
 
     def add(self, epoch, train_loss, val_loss, scores):
         self.epochs.append(epoch)
@@ -53,7 +52,6 @@ class MetricsHistory:
         self.cider_scores.append(scores.get("CIDEr", 0.0))
         self.meteor_scores.append(scores.get("METEOR", 0.0))
         self.rouge_l_scores.append(scores.get("ROUGE_L", 0.0))
-        self.spice_scores.append(scores.get("SPICE", 0.0))
 
     def plot_and_save(self, save_path):
         """绘制并保存折线图"""
@@ -108,13 +106,8 @@ class MetricsHistory:
         axes[1, 1].legend()
         axes[1, 1].grid(True)
 
-        # 6. SPICE
-        axes[1, 2].plot(self.epochs, self.spice_scores, "y-", marker="o", label="SPICE")
-        axes[1, 2].set_xlabel("Epoch")
-        axes[1, 2].set_ylabel("Score")
-        axes[1, 2].set_title("SPICE Score")
-        axes[1, 2].legend()
-        axes[1, 2].grid(True)
+        # 6. Empty (was SPICE)
+        axes[1, 2].axis('off')
 
         plt.tight_layout()
         plt.savefig(save_path, dpi=150)
@@ -143,9 +136,6 @@ class MetricsHistory:
             marker="^",
             label="ROUGE-L",
             linewidth=2,
-        )
-        plt.plot(
-            self.epochs, self.spice_scores, "y-", marker="d", label="SPICE", linewidth=2
         )
 
         plt.xlabel("Epoch", fontsize=12)
@@ -196,7 +186,7 @@ def train_epoch(
     return losses.avg
 
 
-def validate(model, val_loader, criterion, device, vocab, fast_mode=True):
+def validate(model, val_loader, criterion, device, vocab):
     """验证模型性能"""
     model.eval()
     losses = AverageMeter()
@@ -250,14 +240,13 @@ def validate(model, val_loader, criterion, device, vocab, fast_mode=True):
                 res[img_id] = [" ".join(pred_words)]
 
     print("计算评测分数...")
-    scores = evaluator.evaluate(gts, res, fast_mode=fast_mode)
+    scores = evaluator.evaluate(gts, res)
 
     print(f"\n{'='*60}")
     print(f"Validation Loss: {losses.avg:.4f}")
     print(f"CIDEr:   {scores.get('CIDEr', 0.0):.4f}")
     print(f"METEOR:  {scores.get('METEOR', 0.0):.4f}")
     print(f"ROUGE-L: {scores.get('ROUGE_L', 0.0):.4f}")
-    print(f"SPICE:   {scores.get('SPICE', 0.0):.4f}")
     print(f"{'='*60}\n")
 
     return losses.avg, scores  # 修改：返回 scores 而不是单个 cider
@@ -356,7 +345,7 @@ def train(config):
         if epoch % config.get("eval_every", 1) == 0:
             print("\n验证中...")
             val_loss, scores = validate(
-                model, val_loader, criterion, device, vocab, fast_mode=True
+                model, val_loader, criterion, device, vocab
             )
 
             cider = scores.get("CIDEr", 0.0)
@@ -369,7 +358,6 @@ def train(config):
             writer.add_scalar("Val/CIDEr", scores.get("CIDEr", 0.0), epoch)
             writer.add_scalar("Val/METEOR", scores.get("METEOR", 0.0), epoch)
             writer.add_scalar("Val/ROUGE_L", scores.get("ROUGE_L", 0.0), epoch)
-            writer.add_scalar("Val/SPICE", scores.get("SPICE", 0.0), epoch)
 
             # 学习率调度
             scheduler.step(cider)
@@ -420,15 +408,15 @@ def train(config):
 
     writer.close()
 
-    # 在测试集上评估最佳模型 (完整模式，包含 SPICE)
-    print("\n在测试集上评估最佳模型 (完整评测，包含 SPICE)...")
+    # 在测试集上评估最佳模型
+    print("\n在测试集上评估最佳模型...")
     checkpoint = torch.load(
         os.path.join(config["checkpoint_dir"], "best_model.pth"), weights_only=False
     )
     model.load_state_dict(checkpoint["model_state_dict"])
 
     test_loss, test_scores = validate(
-        model, test_loader, criterion, device, vocab, fast_mode=False
+        model, test_loader, criterion, device, vocab
     )
 
     print("\n" + "=" * 70)
@@ -438,7 +426,6 @@ def train(config):
     print(f"CIDEr:       {test_scores.get('CIDEr', 0.0):.4f}")
     print(f"METEOR:      {test_scores.get('METEOR', 0.0):.4f}")
     print(f"ROUGE-L:     {test_scores.get('ROUGE_L', 0.0):.4f}")
-    print(f"SPICE:       {test_scores.get('SPICE', 0.0):.4f}")
     print("=" * 70)
 
     return model
