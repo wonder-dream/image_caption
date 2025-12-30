@@ -9,9 +9,12 @@ from PIL import Image
 import matplotlib.pyplot as plt
 from torchvision import transforms
 from tqdm import tqdm
-from eval_metrics import COCOScoreEvaluator  # 导入刚才创建的模块
 
-from vit_transformer_model import build_model
+import sys
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from utils.eval_metrics import COCOScoreEvaluator
+from models.vit_transformer_model import build_model
 
 
 def load_model(checkpoint_path, device='cuda'):

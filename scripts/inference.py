@@ -4,7 +4,11 @@ import os
 import argparse
 from PIL import Image
 from torchvision import transforms
-from vit_transformer_model import build_model
+
+import sys
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from models.vit_transformer_model import build_model
 
 
 def load_model(checkpoint_path, vocab_path, device):

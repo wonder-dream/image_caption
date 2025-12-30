@@ -3,9 +3,13 @@ ViT + Transformer 模型快速测试
 测试模型是否可以正常前向传播和训练
 """
 
+import os
+import sys
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 import torch
 import json
-from vit_transformer_model import build_model
+from models.vit_transformer_model import build_model
 
 
 def test_model():
@@ -101,7 +105,7 @@ def test_model():
     # 测试数据加载
     print("\n6. 测试数据加载...")
     try:
-        from deepfashion_dataset import create_data_loaders
+        from utils.deepfashion_dataset import create_data_loaders
         
         train_loader, val_loader, test_loader = create_data_loaders(
             data_dir='data',

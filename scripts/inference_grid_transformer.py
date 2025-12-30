@@ -10,8 +10,11 @@ import matplotlib.pyplot as plt
 from torchvision import transforms
 from tqdm import tqdm
 
-from eval_metrics import COCOScoreEvaluator
-from grid_transformer_model import build_model
+import sys
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from utils.eval_metrics import COCOScoreEvaluator
+from models.grid_transformer_model import build_model
 
 
 def load_model(checkpoint_path, device='cuda'):

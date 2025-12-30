@@ -10,9 +10,12 @@ from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 import matplotlib.pyplot as plt
 
-from eval_metrics import COCOScoreEvaluator
-from grid_transformer_model import build_model
-from deepfashion_dataset import create_data_loaders
+import sys
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from utils.eval_metrics import COCOScoreEvaluator
+from models.grid_transformer_model import build_model
+from utils.deepfashion_dataset import create_data_loaders
 
 
 class AverageMeter:
