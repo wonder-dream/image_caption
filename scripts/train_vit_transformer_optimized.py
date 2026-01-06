@@ -603,22 +603,22 @@ if __name__ == "__main__":
         
         # 训练
         "num_epochs": 30,
-        "learning_rate": 3e-4,  # 使用较大初始学习率配合 warmup
+        "learning_rate": 1e-4,  # 降低学习率，更稳定
         "min_lr": 1e-7,
         "weight_decay": 0.01,
-        "finetune_encoder_after_epoch": 10,
+        "finetune_encoder_after_epoch": -1,  # 禁用微调，先只训练 Decoder
         
         # 优化策略
         "label_smoothing": 0.1,        # Label Smoothing
-        "warmup_steps": 2000,          # Warmup 步数
+        "warmup_steps": 1000,          # 减少 Warmup 步数
         "gradient_clip": 1.0,          # 梯度裁剪
         "use_data_augmentation": True, # 数据增强
         "use_ema": True,               # EMA
-        "ema_decay": 0.999,
+        "ema_decay": 0.9999,           # 更高的 decay
         "use_r_drop": False,           # R-Drop (可选，会增加训练时间)
         "r_drop_alpha": 1.0,
         "gradient_accumulation_steps": 1,
-        "patience": 7,                 # 早停 patience
+        "patience": 10,                # 增加早停 patience
         
         # 评估和保存 - 使用绝对路径
         "eval_every": 1,

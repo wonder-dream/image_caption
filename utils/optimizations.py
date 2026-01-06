@@ -27,6 +27,7 @@ class LabelSmoothingLoss(nn.Module):
     标签平滑损失函数
     
     防止模型过于自信，提高泛化能力
+    使用更标准的实现方式
     """
     
     def __init__(self, vocab_size, padding_idx, smoothing=0.1):
@@ -42,20 +43,20 @@ class LabelSmoothingLoss(nn.Module):
             logits: (batch_size * seq_len, vocab_size)
             targets: (batch_size * seq_len,)
         """
-        # 创建平滑的目标分布
-        smooth_targets = torch.zeros_like(logits)
-        smooth_targets.fill_(self.smoothing / (self.vocab_size - 2))  # 排除 padding 和真实标签
-        smooth_targets.scatter_(1, targets.unsqueeze(1), self.confidence)
-        smooth_targets[:, self.padding_idx] = 0
-        
-        # 创建 mask，忽略 padding 位置
-        mask = targets != self.padding_idx
-        
-        # 计算 KL 散度损失
+        # 使用 PyTorch 内置的 label smoothing (更稳定)
         log_probs = F.log_softmax(logits, dim=-1)
-        loss = -torch.sum(smooth_targets * log_probs, dim=-1)
         
-        # 应用 mask
+        # 创建 one-hot 目标
+        nll_loss = -log_probs.gather(dim=-1, index=targets.unsqueeze(1)).squeeze(1)
+        
+        # smooth loss = 所有类别的均匀分布
+        smooth_loss = -log_probs.mean(dim=-1)
+        
+        # 组合损失
+        loss = self.confidence * nll_loss + self.smoothing * smooth_loss
+        
+        # 忽略 padding
+        mask = targets != self.padding_idx
         loss = loss.masked_select(mask).mean()
         
         return loss
@@ -120,13 +121,17 @@ class WarmupCosineScheduler(_LRScheduler):
         super(WarmupCosineScheduler, self).__init__(optimizer, last_epoch)
         
     def get_lr(self):
-        if self.last_epoch < self.warmup_steps:
-            # Warmup 阶段：线性增长
-            warmup_factor = self.last_epoch / max(1, self.warmup_steps)
-            return [base_lr * warmup_factor for base_lr in self.base_lrs]
+        # 使用 self.last_epoch + 1 确保第一步不是 0
+        current_step = self.last_epoch + 1
+        
+        if current_step <= self.warmup_steps:
+            # Warmup 阶段：线性增长，从 min_lr 开始
+            warmup_factor = current_step / max(1, self.warmup_steps)
+            return [self.min_lr + (base_lr - self.min_lr) * warmup_factor for base_lr in self.base_lrs]
         else:
             # Cosine 退火阶段
-            progress = (self.last_epoch - self.warmup_steps) / max(1, self.total_steps - self.warmup_steps)
+            progress = (current_step - self.warmup_steps) / max(1, self.total_steps - self.warmup_steps)
+            progress = min(1.0, progress)  # 防止超过 1
             cosine_factor = 0.5 * (1 + math.cos(math.pi * progress))
             return [self.min_lr + (base_lr - self.min_lr) * cosine_factor for base_lr in self.base_lrs]
 
@@ -157,28 +162,24 @@ class CaptionAugmentation:
     图像描述任务专用的数据增强
     
     包含适合 caption 任务的图像变换
+    注意：图像描述任务不宜使用过强的增强，因为描述需要与图像内容匹配
     """
     
     @staticmethod
     def get_train_transforms(image_size=224):
-        """训练时的数据增强"""
+        """训练时的数据增强（温和版本）"""
         return transforms.Compose([
-            transforms.RandomResizedCrop(image_size, scale=(0.8, 1.0)),
+            transforms.Resize(256),
+            transforms.RandomCrop(image_size),  # 比 RandomResizedCrop 更温和
             transforms.RandomHorizontalFlip(p=0.5),
             transforms.ColorJitter(
-                brightness=0.2,
-                contrast=0.2,
-                saturation=0.2,
-                hue=0.1
-            ),
-            transforms.RandomAffine(
-                degrees=10,
-                translate=(0.1, 0.1),
-                scale=(0.9, 1.1)
+                brightness=0.1,  # 降低强度
+                contrast=0.1,
+                saturation=0.1,
+                hue=0.05
             ),
             transforms.ToTensor(),
             transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
-            transforms.RandomErasing(p=0.1, scale=(0.02, 0.1)),
         ])
     
     @staticmethod

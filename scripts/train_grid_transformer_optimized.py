@@ -560,22 +560,22 @@ if __name__ == "__main__":
         
         # 训练
         "num_epochs": 30,
-        "learning_rate": 3e-4,
+        "learning_rate": 1e-4,  # 降低学习率，更稳定
         "min_lr": 1e-7,
         "weight_decay": 0.01,
-        "finetune_encoder_after_epoch": 10,
+        "finetune_encoder_after_epoch": -1,  # 禁用微调，先只训练 Decoder
         
         # 优化策略
         "label_smoothing": 0.1,
-        "warmup_steps": 2000,
+        "warmup_steps": 1000,  # 减少 warmup 步数
         "gradient_clip": 1.0,
         "use_data_augmentation": True,
         "use_ema": True,
-        "ema_decay": 0.999,
+        "ema_decay": 0.9999,  # 更高的 decay，更稳定
         "use_r_drop": False,
         "r_drop_alpha": 1.0,
         "gradient_accumulation_steps": 1,
-        "patience": 7,
+        "patience": 10,  # 增加 patience
         
         # 评估和保存 - 使用绝对路径
         "eval_every": 1,
