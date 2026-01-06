@@ -434,24 +434,36 @@ class ExponentialMovingAverage:
         for name, param in self.model.named_parameters():
             if param.requires_grad:
                 self.shadow[name] = param.data.clone()
+    
+    def register_new_params(self):
+        """注册新的可训练参数（用于动态解冻层时）"""
+        for name, param in self.model.named_parameters():
+            if param.requires_grad and name not in self.shadow:
+                self.shadow[name] = param.data.clone()
                 
     def update(self):
         """更新 EMA 参数"""
         for name, param in self.model.named_parameters():
             if param.requires_grad:
-                self.shadow[name] = self.decay * self.shadow[name] + (1 - self.decay) * param.data
+                # 如果是新解冻的参数，先注册
+                if name not in self.shadow:
+                    self.shadow[name] = param.data.clone()
+                else:
+                    self.shadow[name] = self.decay * self.shadow[name] + (1 - self.decay) * param.data
                 
     def apply_shadow(self):
         """应用 EMA 参数（用于评估）"""
         for name, param in self.model.named_parameters():
             if param.requires_grad:
-                self.backup[name] = param.data
-                param.data = self.shadow[name]
+                self.backup[name] = param.data.clone()
+                # 只有已注册的参数才应用 shadow
+                if name in self.shadow:
+                    param.data = self.shadow[name]
                 
     def restore(self):
         """恢复原始参数（用于继续训练）"""
         for name, param in self.model.named_parameters():
-            if param.requires_grad:
+            if param.requires_grad and name in self.backup:
                 param.data = self.backup[name]
         self.backup = {}
 
