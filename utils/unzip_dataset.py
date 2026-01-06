@@ -4,6 +4,10 @@ import subprocess
 import shutil
 import sys
 
+# 获取项目根目录（utils 的上级目录）
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+PROJECT_ROOT = os.path.dirname(SCRIPT_DIR)
+
 # 尝试导入 tqdm，如果不存在则定义一个简单的替代品
 try:
     from tqdm import tqdm
@@ -19,13 +23,20 @@ except ImportError:
             def __exit__(self, *args): pass
         return SimpleBar()
 
-def unzip_dataset(zip_path="data/images.zip", extract_dir="data"):
+def unzip_dataset(zip_path=None, extract_dir=None):
     """
     解压数据集文件到指定目录。
     优先使用系统 unzip 命令加速并配合 tqdm 显示进度。
     """
+    # 使用绝对路径
+    if zip_path is None:
+        zip_path = os.path.join(PROJECT_ROOT, "data", "images.zip")
+    if extract_dir is None:
+        extract_dir = os.path.join(PROJECT_ROOT, "data")
+    
     if not os.path.exists(zip_path):
         print(f"错误: 未找到zip文件 '{zip_path}'")
+        print(f"请确保 images.zip 文件位于 data/ 目录下")
         return
 
     # 确保解压目录存在

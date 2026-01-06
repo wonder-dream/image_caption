@@ -22,6 +22,9 @@ import matplotlib.pyplot as plt
 import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+# 获取项目根目录
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
 from utils.eval_metrics import COCOScoreEvaluator
 from models.grid_transformer_model import build_model
 from utils.deepfashion_dataset import DeepFashionDataset
@@ -136,8 +139,6 @@ class MetricsHistory:
 
 def create_optimized_data_loaders(data_dir, vocab_path, batch_size, num_workers, image_size=224, use_augmentation=True):
     """创建带数据增强的数据加载器"""
-    with open(vocab_path, 'r', encoding='utf-8') as f:
-        vocab = json.load(f)
     
     if use_augmentation:
         train_transform = CaptionAugmentation.get_train_transforms(image_size)
@@ -146,24 +147,25 @@ def create_optimized_data_loaders(data_dir, vocab_path, batch_size, num_workers,
     
     val_transform = CaptionAugmentation.get_val_transforms(image_size)
     
+    # 使用正确的参数名称
     train_dataset = DeepFashionDataset(
-        data_dir=data_dir,
+        dataset_path=os.path.join(data_dir, 'train_data.json'),
+        vocab_path=vocab_path,
         split='train',
-        vocab=vocab,
         transform=train_transform
     )
     
     val_dataset = DeepFashionDataset(
-        data_dir=data_dir,
+        dataset_path=os.path.join(data_dir, 'val_data.json'),
+        vocab_path=vocab_path,
         split='val',
-        vocab=vocab,
         transform=val_transform
     )
     
     test_dataset = DeepFashionDataset(
-        data_dir=data_dir,
+        dataset_path=os.path.join(data_dir, 'test_data.json'),
+        vocab_path=vocab_path,
         split='test',
-        vocab=vocab,
         transform=val_transform
     )
     
@@ -540,9 +542,9 @@ def train_optimized(config):
 
 if __name__ == "__main__":
     config = {
-        # 数据
-        "data_dir": "data",
-        "vocab_path": "data/vocab.json",
+        # 数据 - 使用绝对路径
+        "data_dir": os.path.join(PROJECT_ROOT, "data"),
+        "vocab_path": os.path.join(PROJECT_ROOT, "data", "vocab.json"),
         "batch_size": 32,
         "num_workers": 8,
         
@@ -575,13 +577,13 @@ if __name__ == "__main__":
         "gradient_accumulation_steps": 1,
         "patience": 7,
         
-        # 评估和保存
+        # 评估和保存 - 使用绝对路径
         "eval_every": 1,
-        "checkpoint_dir": "checkpoints/grid_transformer_optimized",
+        "checkpoint_dir": os.path.join(PROJECT_ROOT, "checkpoints", "grid_transformer_optimized"),
         
-        # 日志
+        # 日志 - 使用绝对路径
         "use_tensorboard": True,
-        "log_dir": "runs/grid_transformer_optimized",
+        "log_dir": os.path.join(PROJECT_ROOT, "runs", "grid_transformer_optimized"),
     }
 
     print("=" * 70)

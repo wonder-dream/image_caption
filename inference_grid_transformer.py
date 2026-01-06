@@ -3,6 +3,7 @@ Grid-Transformer 模型推理和测试脚本
 """
 
 import os
+import sys
 import json
 import torch
 from PIL import Image
@@ -10,8 +11,11 @@ import matplotlib.pyplot as plt
 from torchvision import transforms
 from tqdm import tqdm
 
-from eval_metrics import COCOScoreEvaluator
-from grid_transformer_model import build_model
+# 添加项目根目录到路径
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+from utils.eval_metrics import COCOScoreEvaluator
+from models.grid_transformer_model import build_model
 
 
 def load_model(checkpoint_path, device='cuda'):

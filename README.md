@@ -13,16 +13,16 @@ image_caption/
 │
 ├── scripts/                         # 训练和推理脚本
 │   ├── __init__.py
-│   ├── train_vit_transformer.py         # ViT 模型训练 (交叉熵)
-│   ├── train_grid_transformer.py        # Grid 模型训练 (交叉熵)
-│   ├── train_vit_transformer_scst.py    # ViT 模型 SCST 强化学习训练
-│   ├── train_grid_transformer_scst.py   # Grid 模型 SCST 强化学习训练
-│   ├── train_vit_transformer_optimized.py   # ViT 模型优化版训练
-│   ├── train_grid_transformer_optimized.py  # Grid 模型优化版训练
-│   ├── inference_vit_transformer.py     # ViT 模型推理脚本
-│   ├── inference_grid_transformer.py    # Grid 模型推理脚本
-│   ├── inference.py                     # 通用推理脚本
-│   └── test_model.py                    # 模型测试脚本
+│   ├── train_vit_transformer.py              # ViT 模型基础训练 (交叉熵)
+│   ├── train_grid_transformer.py             # Grid 模型基础训练 (交叉熵)
+│   ├── train_vit_transformer_optimized.py    # ViT 模型优化版训练
+│   ├── train_grid_transformer_optimized.py   # Grid 模型优化版训练
+│   ├── train_vit_transformer_scst_optimized.py   # ViT SCST+优化 训练
+│   ├── train_grid_transformer_scst_optimized.py  # Grid SCST+优化 训练
+│   ├── inference_vit_transformer.py          # ViT 模型推理脚本
+│   ├── inference_grid_transformer.py         # Grid 模型推理脚本
+│   ├── inference.py                          # 通用推理脚本
+│   └── test_model.py                         # 模型测试脚本
 │
 ├── utils/                           # 工具模块
 │   ├── __init__.py
@@ -41,12 +41,12 @@ image_caption/
 │   └── test_data.json               # 测试集
 │
 ├── checkpoints/                     # 模型检查点
-│   ├── vit_transformer/             # ViT XE 预训练模型
-│   ├── vit_transformer_scst/        # ViT SCST 强化学习模型
+│   ├── vit_transformer/             # ViT 基础模型
 │   ├── vit_transformer_optimized/   # ViT 优化版模型
-│   ├── grid_transformer/            # Grid XE 预训练模型
-│   ├── grid_transformer_scst/       # Grid SCST 强化学习模型
-│   └── grid_transformer_optimized/  # Grid 优化版模型
+│   ├── vit_transformer_scst_opt/    # ViT SCST+优化模型
+│   ├── grid_transformer/            # Grid 基础模型
+│   ├── grid_transformer_optimized/  # Grid 优化版模型
+│   └── grid_transformer_scst_opt/   # Grid SCST+优化模型
 │
 ├── 模型完成总结.md                   # 项目总结文档
 └── README.md                        # 本文件
@@ -84,16 +84,16 @@ python scripts/train_vit_transformer_optimized.py
 python scripts/train_grid_transformer_optimized.py
 ```
 
-### 3. 强化学习微调（SCST）
+### 3. 强化学习微调（SCST + 优化）
 
-SCST (Self-Critical Sequence Training) 直接优化评测指标，需要先完成交叉熵预训练。
+SCST (Self-Critical Sequence Training) 直接优化评测指标，需要先完成优化版训练。
 
 ```bash
-# ViT 模型 SCST 训练
-python scripts/train_vit_transformer_scst.py
+# ViT 模型 SCST+优化 训练
+python scripts/train_vit_transformer_scst_optimized.py
 
-# Grid 模型 SCST 训练
-python scripts/train_grid_transformer_scst.py
+# Grid 模型 SCST+优化 训练
+python scripts/train_grid_transformer_scst_optimized.py
 ```
 
 ### 4. 推理测试

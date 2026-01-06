@@ -22,6 +22,9 @@ import matplotlib.pyplot as plt
 import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+# 获取项目根目录
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
 from utils.eval_metrics import COCOScoreEvaluator
 from utils.scst_loss import SCSTLoss, get_reference_captions
 from utils.optimizations import (
@@ -32,7 +35,7 @@ from utils.optimizations import (
     GradientClipping,
 )
 from models.grid_transformer_model import build_model
-from utils.deepfashion_dataset import DeepFashionCaptionDataset
+from utils.deepfashion_dataset import DeepFashionDataset
 
 
 class AverageMeter:
@@ -173,29 +176,29 @@ def create_data_loaders_with_augmentation(config):
     train_transform = CaptionAugmentation.get_train_transforms(image_size=224)
     val_transform = CaptionAugmentation.get_val_transforms(image_size=224)
     
-    # 创建数据集
-    train_dataset = DeepFashionCaptionDataset(
-        data_file=os.path.join(config["data_dir"], "train_data.json"),
-        image_dir=os.path.join(config["data_dir"], "images"),
-        vocab=vocab,
+    # 创建数据集 - 使用 DeepFashionDataset
+    train_dataset = DeepFashionDataset(
+        dataset_path=os.path.join(config["data_dir"], "train_data.json"),
+        vocab_path=config["vocab_path"],
+        split='train',
+        max_len=config.get("max_len", 52),
         transform=train_transform,
-        max_len=config.get("max_len", 52),
     )
     
-    val_dataset = DeepFashionCaptionDataset(
-        data_file=os.path.join(config["data_dir"], "val_data.json"),
-        image_dir=os.path.join(config["data_dir"], "images"),
-        vocab=vocab,
-        transform=val_transform,
+    val_dataset = DeepFashionDataset(
+        dataset_path=os.path.join(config["data_dir"], "val_data.json"),
+        vocab_path=config["vocab_path"],
+        split='val',
         max_len=config.get("max_len", 52),
+        transform=val_transform,
     )
     
-    test_dataset = DeepFashionCaptionDataset(
-        data_file=os.path.join(config["data_dir"], "test_data.json"),
-        image_dir=os.path.join(config["data_dir"], "images"),
-        vocab=vocab,
-        transform=val_transform,
+    test_dataset = DeepFashionDataset(
+        dataset_path=os.path.join(config["data_dir"], "test_data.json"),
+        vocab_path=config["vocab_path"],
+        split='test',
         max_len=config.get("max_len", 52),
+        transform=val_transform,
     )
     
     train_loader = DataLoader(
@@ -566,9 +569,9 @@ def train_scst_optimized(config):
 
 if __name__ == "__main__":
     config = {
-        # 数据
-        "data_dir": "data",
-        "vocab_path": "data/vocab.json",
+        # 数据 - 使用绝对路径
+        "data_dir": os.path.join(PROJECT_ROOT, "data"),
+        "vocab_path": os.path.join(PROJECT_ROOT, "data", "vocab.json"),
         "batch_size": 16,  # 实际batch = batch_size * gradient_accumulation_steps
         "num_workers": 4,
         "max_len": 52,
@@ -583,8 +586,8 @@ if __name__ == "__main__":
         "backbone": "resnet101",
         "pretrained_backbone": True,
         
-        # 预训练模型路径 (必须提供 XE 预训练模型)
-        "pretrain_checkpoint": "checkpoints/grid_transformer/best_model.pth",
+        # 预训练模型路径 - 使用绝对路径
+        "pretrain_checkpoint": os.path.join(PROJECT_ROOT, "checkpoints", "grid_transformer_optimized", "best_model.pth"),
         
         # SCST 训练
         "num_epochs": 30,
@@ -601,13 +604,13 @@ if __name__ == "__main__":
         "ema_decay": 0.9999,
         "early_stopping_patience": 8,
         
-        # 评估和保存
+        # 评估和保存 - 使用绝对路径
         "eval_every": 1,
-        "checkpoint_dir": "checkpoints/grid_transformer_scst_opt",
+        "checkpoint_dir": os.path.join(PROJECT_ROOT, "checkpoints", "grid_transformer_scst_opt"),
         
-        # 日志
+        # 日志 - 使用绝对路径
         "use_tensorboard": True,
-        "log_dir": "runs/grid_transformer_scst_opt",
+        "log_dir": os.path.join(PROJECT_ROOT, "runs", "grid_transformer_scst_opt"),
     }
 
     print("=" * 70)

@@ -14,6 +14,9 @@ import matplotlib.pyplot as plt
 import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+# 获取项目根目录
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
 from utils.eval_metrics import COCOScoreEvaluator
 from models.vit_transformer_model import build_model
 from utils.deepfashion_dataset import create_data_loaders
@@ -481,9 +484,9 @@ def train(config):
 
 if __name__ == "__main__":
     config = {
-        # 数据
-        "data_dir": "data",
-        "vocab_path": "data/vocab.json",
+        # 数据 - 使用绝对路径
+        "data_dir": os.path.join(PROJECT_ROOT, "data"),
+        "vocab_path": os.path.join(PROJECT_ROOT, "data", "vocab.json"),
         "batch_size": 32,
         "num_workers": 8,
         # 模型
@@ -498,13 +501,13 @@ if __name__ == "__main__":
         "num_epochs": 30,
         "learning_rate": 0.0001,
         "finetune_encoder_after_epoch": 10,
-        # 评估和保存
+        # 评估和保存 - 使用绝对路径
         "eval_every": 1,
         "save_every": 5,
-        "checkpoint_dir": "checkpoints/vit_transformer",
-        # 日志
+        "checkpoint_dir": os.path.join(PROJECT_ROOT, "checkpoints", "vit_transformer"),
+        # 日志 - 使用绝对路径
         "use_tensorboard": True,
-        "log_dir": "runs/vit_transformer",
+        "log_dir": os.path.join(PROJECT_ROOT, "runs", "vit_transformer"),
     }
 
     print("=" * 70)

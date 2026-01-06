@@ -13,6 +13,9 @@ import matplotlib.pyplot as plt
 import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+# 获取项目根目录
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
 from utils.eval_metrics import COCOScoreEvaluator
 from models.grid_transformer_model import build_model
 from utils.deepfashion_dataset import create_data_loaders
@@ -436,9 +439,9 @@ def train(config):
 
 if __name__ == "__main__":
     config = {
-        # 数据
-        "data_dir": "data",
-        "vocab_path": "data/vocab.json",
+        # 数据 - 使用绝对路径
+        "data_dir": os.path.join(PROJECT_ROOT, "data"),
+        "vocab_path": os.path.join(PROJECT_ROOT, "data", "vocab.json"),
         "batch_size": 32,
         "num_workers": 8,  # Linux下可以设为8
         # 模型 (Grid-Transformer)
@@ -454,12 +457,12 @@ if __name__ == "__main__":
         "num_epochs": 30,
         "learning_rate": 1e-4,
         "finetune_encoder_after_epoch": 5,
-        # 评估和保存
+        # 评估和保存 - 使用绝对路径
         "eval_every": 1,
         "save_every": 5,
-        "checkpoint_dir": "checkpoints/grid_transformer",
-        # 日志
-        "log_dir": "runs/grid_transformer",
+        "checkpoint_dir": os.path.join(PROJECT_ROOT, "checkpoints", "grid_transformer"),
+        # 日志 - 使用绝对路径
+        "log_dir": os.path.join(PROJECT_ROOT, "runs", "grid_transformer"),
     }
 
     print("=" * 70)
