@@ -230,9 +230,9 @@ def create_data_loaders_with_augmentation(config):
 
 def train_epoch_scst_optimized(
     model, train_loader, scst_loss, optimizer, scheduler, 
-    epoch, device, vocab, writer, global_step, config, ema=None
+    epoch, device, vocab, writer, global_step, config, ema=None, scaler=None
 ):
-    """使用 SCST + 优化技术 训练一个 epoch"""
+    """使用 SCST + 优化技术 训练一个 epoch (支持 AMP)"""
     model.train()
 
     reward_meter = AverageMeter()
@@ -240,6 +240,8 @@ def train_epoch_scst_optimized(
     sample_reward_meter = AverageMeter()
     
     accumulation_steps = config.get("gradient_accumulation_steps", 1)
+    scst_max_len = config.get("scst_max_len", 30)  # SCST 专用生成长度
+    use_amp = config.get("use_amp", False) and scaler is not None
     
     idx2word = {idx: word for word, idx in vocab.items()}
 
@@ -254,26 +256,47 @@ def train_epoch_scst_optimized(
         # 获取参考描述
         references = get_reference_captions(captions, vocab)
 
-        # 计算 SCST 损失
-        loss, reward_info = scst_loss(
-            model, images, references, vocab, device, max_len=50
-        )
-        
-        # 梯度累积
-        loss = loss / accumulation_steps
-        loss.backward()
+        # 使用 AMP 混合精度
+        if use_amp:
+            with torch.cuda.amp.autocast():
+                loss, reward_info = scst_loss(
+                    model, images, references, vocab, device, max_len=scst_max_len
+                )
+            
+            loss = loss / accumulation_steps
+            scaler.scale(loss).backward()
+            
+            if (batch_idx + 1) % accumulation_steps == 0:
+                scaler.unscale_(optimizer)
+                GradientClipping.clip_grad_norm(model, max_norm=config.get("gradient_clip", 5.0))
+                scaler.step(optimizer)
+                scaler.update()
+                scheduler.step()
+                optimizer.zero_grad()
+                
+                if ema is not None:
+                    ema.update()
+        else:
+            # 计算 SCST 损失
+            loss, reward_info = scst_loss(
+                model, images, references, vocab, device, max_len=scst_max_len
+            )
+            
+            # 梯度累积
+            loss = loss / accumulation_steps
+            loss.backward()
 
-        if (batch_idx + 1) % accumulation_steps == 0:
-            # 梯度裁剪
-            GradientClipping.clip_grad_norm(model, max_norm=config.get("gradient_clip", 5.0))
-            
-            optimizer.step()
-            scheduler.step()
-            optimizer.zero_grad()
-            
-            # 更新 EMA
-            if ema is not None:
-                ema.update()
+            if (batch_idx + 1) % accumulation_steps == 0:
+                # 梯度裁剪
+                GradientClipping.clip_grad_norm(model, max_norm=config.get("gradient_clip", 5.0))
+                
+                optimizer.step()
+                scheduler.step()
+                optimizer.zero_grad()
+                
+                # 更新 EMA
+                if ema is not None:
+                    ema.update()
 
         reward_meter.update(reward_info['greedy_reward'], images.size(0))
         advantage_meter.update(reward_info['advantage'], images.size(0))
@@ -390,7 +413,7 @@ def train_scst_optimized(config):
     # 加载预训练的 XE 模型权重（必须）
     if config.get("pretrain_checkpoint"):
         print(f"\n加载预训练模型: {config['pretrain_checkpoint']}")
-        checkpoint = torch.load(config["pretrain_checkpoint"], map_location=device)
+        checkpoint = torch.load(config["pretrain_checkpoint"], map_location=device, weights_only=False)
         model.load_state_dict(checkpoint["model_state_dict"])
         print("预训练模型加载成功！")
     else:
@@ -437,6 +460,12 @@ def train_scst_optimized(config):
         ema = ExponentialMovingAverage(model, decay=config.get("ema_decay", 0.999))
         print(f"\n启用 EMA，衰减系数: {config.get('ema_decay', 0.999)}")
 
+    # AMP 混合精度
+    scaler = None
+    if config.get("use_amp", False):
+        scaler = torch.cuda.amp.GradScaler()
+        print("\n启用 AMP 混合精度训练")
+
     # 早停
     early_stopping = EarlyStopping(
         patience=config.get("early_stopping_patience", 5),
@@ -456,8 +485,10 @@ def train_scst_optimized(config):
     print("=" * 70)
     print("优化技术:")
     print(f"  - SCST 强化学习 (reward_type: {config.get('reward_type', 'cider')})")
-    print(f"  - 数据增强 (RandomResizedCrop, ColorJitter, etc.)")
-    print(f"  - Warmup + Cosine LR")
+    print(f"  - SCST 生成长度: {config.get('scst_max_len', 30)}")
+    print(f"  - AMP 混合精度: {config.get('use_amp', False)}")
+    print("  - 数据增强 (RandomResizedCrop, ColorJitter, etc.)")
+    print("  - Warmup + Cosine LR")
     print(f"  - EMA: {config.get('use_ema', True)}")
     print(f"  - 梯度累积: {config.get('gradient_accumulation_steps', 1)} steps")
     print(f"  - 早停: patience={config.get('early_stopping_patience', 5)}")
@@ -473,7 +504,7 @@ def train_scst_optimized(config):
         # 训练
         sample_reward, greedy_reward, advantage = train_epoch_scst_optimized(
             model, train_loader, scst_loss, optimizer, scheduler,
-            epoch, device, vocab, writer, global_step, config, ema
+            epoch, device, vocab, writer, global_step, config, ema, scaler
         )
 
         current_lr = scheduler.get_last_lr()[0]
@@ -550,7 +581,8 @@ def train_scst_optimized(config):
     print("\n在测试集上评估最佳模型...")
     checkpoint = torch.load(
         os.path.join(config["checkpoint_dir"], "best_model.pth"), 
-        map_location=device
+        map_location=device,
+        weights_only=False
     )
     model.load_state_dict(checkpoint["model_state_dict"])
 
@@ -572,40 +604,41 @@ if __name__ == "__main__":
         # 数据 - 使用绝对路径
         "data_dir": os.path.join(PROJECT_ROOT, "data"),
         "vocab_path": os.path.join(PROJECT_ROOT, "data", "vocab.json"),
-        "batch_size": 16,  # 实际batch = batch_size * gradient_accumulation_steps
+        "batch_size": 8,  # 增大 batch size 加速训练
         "num_workers": 4,
         "max_len": 52,
         
         # 模型 (需与预训练模型一致)
         "d_model": 512,
         "nhead": 8,
-        "num_encoder_layers": 3,
+        "num_encoder_layers": 6,  # 必须与优化版一致！
         "num_decoder_layers": 6,
         "dim_feedforward": 2048,
-        "dropout": 0.1,
-        "backbone": "resnet101",
-        "pretrained_backbone": True,
+        "dropout": 0.15,  # 必须与优化版一致！
+        "pretrained_cnn": True,
         
         # 预训练模型路径 - 使用绝对路径
         "pretrain_checkpoint": os.path.join(PROJECT_ROOT, "checkpoints", "grid_transformer_optimized", "best_model.pth"),
         
         # SCST 训练
-        "num_epochs": 30,
+        "num_epochs": 10,  # SCST 通常 10 个 epoch 足够
         "learning_rate": 5e-6,  # SCST用较小学习率
         "min_lr": 1e-7,
         "weight_decay": 0.01,
         "reward_type": "cider",  # 'cider', 'bleu', 或 'combined'
+        "scst_max_len": 30,  # SCST 生成长度，减少加速训练
         
         # 优化技术
-        "warmup_ratio": 0.1,  # 10% warmup
-        "gradient_accumulation_steps": 2,  # 梯度累积
-        "gradient_clip": 1.0,
-        "use_ema": True,
+        "warmup_ratio": 0.05,  # 减少到 5% warmup
+        "gradient_accumulation_steps": 4,  # 减少梯度累积，有效 batch = 8 * 4 = 32
+        "gradient_clip": 5.0,  # 放宽梯度裁剪
+        "use_ema": False,  # 先禁用 EMA
         "ema_decay": 0.9999,
-        "early_stopping_patience": 8,
+        "early_stopping_patience": 5,  # 减少 patience 加速早停
+        "use_amp": True,  # 启用混合精度训练
         
         # 评估和保存 - 使用绝对路径
-        "eval_every": 1,
+        "eval_every": 2,  # 每 2 个 epoch 评估一次，减少验证耗时
         "checkpoint_dir": os.path.join(PROJECT_ROOT, "checkpoints", "grid_transformer_scst_opt"),
         
         # 日志 - 使用绝对路径

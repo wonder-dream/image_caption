@@ -1,147 +1,127 @@
-import torch
-import json
-import os
+﻿import os
+import sys
 import argparse
+import json
+import torch
 from PIL import Image
+import matplotlib.pyplot as plt
 from torchvision import transforms
 
-import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-from models.vit_transformer_model import build_model
 
-
-def load_model(checkpoint_path, vocab_path, device):
-    """
-    加载模型和词典
-    """
-    print(f"正在加载模型: {checkpoint_path}")
-
-    # 1. 加载 Checkpoint
-    # 注意：weights_only=False 是为了兼容包含 numpy 数据的 checkpoint
+def load_model(checkpoint_path, model_type, device):
+    print(f"Loading model: {checkpoint_path}")
     checkpoint = torch.load(checkpoint_path, map_location=device, weights_only=False)
-    config = checkpoint["config"]
-
-    # 2. 加载词典
-    print(f"正在加载词典: {vocab_path}")
-    with open(vocab_path, "r", encoding="utf-8") as f:
+    config = checkpoint.get('config', {})
+    
+    vocab_path = config.get('vocab_path', os.path.join(PROJECT_ROOT, 'data', 'vocab.json'))
+    with open(vocab_path, 'r', encoding='utf-8') as f:
         vocab = json.load(f)
-
-    # 3. 构建模型结构
-    vocab_size = len(vocab)
-    model = build_model(vocab_size, config)
-
-    # 4. 加载权重
-    model.load_state_dict(checkpoint["model_state_dict"])
+    
+    if model_type == 'vit':
+        from models.vit_transformer_model import build_model
+    else:
+        from models.grid_transformer_model import build_model
+    
+    model = build_model(len(vocab), config)
+    model.load_state_dict(checkpoint['model_state_dict'])
     model = model.to(device)
     model.eval()
-
+    
+    print("Model loaded successfully!")
     return model, vocab, config
 
 
-def preprocess_image(image_path):
-    """
-    读取并预处理图片
-    """
-    # ViT 标准预处理
-    transform = transforms.Compose(
-        [
-            transforms.Resize((224, 224)),
-            transforms.ToTensor(),
-            transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
-        ]
-    )
-
-    image = Image.open(image_path).convert("RGB")
-    image = transform(image)
-    return image
+def preprocess_image(image_path, image_size=224):
+    transform = transforms.Compose([
+        transforms.Resize((image_size, image_size)),
+        transforms.ToTensor(),
+        transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
+    ])
+    image = Image.open(image_path).convert('RGB')
+    return transform(image).unsqueeze(0)
 
 
-def generate_caption(model, image, vocab, device, max_len=50):
-    """
-    生成描述 (Greedy Search)
-    """
-    # 反向词典: index -> word
-    idx2word = {v: k for k, v in vocab.items()}
-
-    # 准备输入
-    image = image.unsqueeze(0).to(device)  # (1, 3, 224, 224)
-
+def generate_caption(model, image_tensor, vocab, device, method='greedy', beam_size=5, max_len=50):
+    image_tensor = image_tensor.to(device)
+    
     with torch.no_grad():
-        # 1. 编码图片
-        features = model.encoder(image)  # (1, 196, 512)
+        caption_ids = model.generate(
+            image_tensor,
+            start_token=vocab['<start>'],
+            end_token=vocab['<end>'],
+            max_len=max_len,
+            method=method,
+            beam_size=beam_size
+        )
+    
+    caption_ids = caption_ids[0].cpu().tolist()
+    idx2word = {idx: word for word, idx in vocab.items()}
+    
+    words = []
+    for idx in caption_ids:
+        if idx == vocab['<end>']:
+            break
+        if idx not in [vocab['<start>'], vocab['<pad>']]:
+            words.append(idx2word[idx])
+    
+    return ' '.join(words)
 
-        # 2. 解码生成
-        inputs = torch.tensor([vocab["<start>"]]).unsqueeze(0).to(device)  # (1, 1)
-        result_caption = []
 
-        for _ in range(max_len):
-            outputs = model.decoder(inputs, features)  # (1, seq_len, vocab_size)
-
-            # 获取最后一个时间步的预测
-            last_token_logits = outputs[:, -1, :]
-            _, predicted_id = last_token_logits.max(1)
-
-            predicted_id = predicted_id.item()
-
-            # 如果遇到结束符，停止
-            if predicted_id == vocab["<end>"]:
-                break
-
-            # 记录单词
-            word = idx2word.get(predicted_id, "<unk>")
-            if word != "<start>" and word != "<pad>":
-                result_caption.append(word)
-
-            # 将预测词作为下一次的输入
-            inputs = torch.cat(
-                [inputs, torch.tensor([[predicted_id]]).to(device)], dim=1
-            )
-
-    return " ".join(result_caption)
+def visualize(image_path, caption, save_path=None):
+    image = Image.open(image_path).convert('RGB')
+    
+    plt.figure(figsize=(10, 6))
+    plt.imshow(image)
+    plt.axis('off')
+    plt.title(f"Generated Caption:\n{caption}", fontsize=12, wrap=True, pad=20)
+    plt.tight_layout()
+    
+    if save_path:
+        plt.savefig(save_path, dpi=150, bbox_inches='tight')
+        print(f"Result saved to: {save_path}")
+    
+    plt.show()
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Image Captioning Inference")
-    parser.add_argument("--image", type=str, required=True, help="Path to input image")
-    parser.add_argument(
-        "--model",
-        type=str,
-        default="checkpoints/vit_transformer/best_model.pth",
-        help="Path to model checkpoint",
-    )
-    parser.add_argument(
-        "--vocab", type=str, default="data/vocab.json", help="Path to vocab json"
-    )
+    parser = argparse.ArgumentParser(description='Image Caption Inference')
+    parser.add_argument('--image', type=str, required=True, help='Input image path')
+    parser.add_argument('--checkpoint', type=str, required=True, help='Model checkpoint path')
+    parser.add_argument('--model_type', type=str, choices=['vit', 'grid'], required=True, help='Model type')
+    parser.add_argument('--method', type=str, default='greedy', choices=['greedy', 'beam_search'], help='Generation method')
+    parser.add_argument('--beam_size', type=int, default=5, help='Beam size for beam search')
+    parser.add_argument('--save', type=str, default=None, help='Path to save visualization')
+    parser.add_argument('--no_vis', action='store_true', help='Disable visualization')
+    
     args = parser.parse_args()
-
-    # 检查文件是否存在
+    
     if not os.path.exists(args.image):
-        print(f"错误: 图片文件不存在 {args.image}")
+        print(f"Error: Image not found {args.image}")
         return
-
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    print(f"使用设备: {device}")
-
-    try:
-        # 加载模型
-        model, vocab, _ = load_model(args.model, args.vocab, device)
-
-        # 处理图片
-        image = preprocess_image(args.image)
-
-        # 生成描述
-        print("-" * 50)
-        print(f"正在分析图片: {args.image} ...")
-        caption = generate_caption(model, image, vocab, device)
-
-        print("\n生成的描述:")
-        print(f"Step 1: {caption}")
-        print("-" * 50)
-
-    except Exception as e:
-        print(f"发生错误: {e}")
+    if not os.path.exists(args.checkpoint):
+        print(f"Error: Checkpoint not found {args.checkpoint}")
+        return
+    
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    print(f"Using device: {device}")
+    
+    model, vocab, config = load_model(args.checkpoint, args.model_type, device)
+    image_tensor = preprocess_image(args.image)
+    
+    print(f"\nGenerating caption using {args.method}...")
+    caption = generate_caption(model, image_tensor, vocab, device, method=args.method, beam_size=args.beam_size)
+    
+    print("\n" + "=" * 60)
+    print(f"Image: {args.image}")
+    print(f"Caption: {caption}")
+    print("=" * 60)
+    
+    if not args.no_vis:
+        visualize(args.image, caption, save_path=args.save)
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()

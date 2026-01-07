@@ -5,7 +5,18 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="5d69e8d3-0a43-4d07-bc6e-b43fed71b3c3" name="更改" comment="">
-      <change beforePath="$PROJECT_DIR$/image_caption.ipynb" beforeDir="false" afterPath="$PROJECT_DIR$/image_caption.ipynb" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/inference_grid_transformer.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/inference_vit_transformer.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/scripts/inference.py" beforeDir="false" afterPath="$PROJECT_DIR$/scripts/inference.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/scripts/inference_grid_transformer.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/scripts/inference_vit_transformer.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/scripts/test_model.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/scripts/train_grid_transformer_optimized.py" beforeDir="false" afterPath="$PROJECT_DIR$/scripts/train_grid_transformer_optimized.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/scripts/train_grid_transformer_scst_optimized.py" beforeDir="false" afterPath="$PROJECT_DIR$/scripts/train_grid_transformer_scst_optimized.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/scripts/train_vit_transformer_optimized.py" beforeDir="false" afterPath="$PROJECT_DIR$/scripts/train_vit_transformer_optimized.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/scripts/train_vit_transformer_scst_optimized.py" beforeDir="false" afterPath="$PROJECT_DIR$/scripts/train_vit_transformer_scst_optimized.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/utils/deepfashion_dataset.py" beforeDir="false" afterPath="$PROJECT_DIR$/utils/deepfashion_dataset.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -85,6 +96,8 @@
       <workItem from="1764750168152" duration="7209000" />
       <workItem from="1765115464045" duration="100000" />
       <workItem from="1765115673009" duration="387000" />
+      <workItem from="1767790913069" duration="15000" />
+      <workItem from="1767790948824" duration="512000" />
     </task>
     <servers />
   </component>
@@ -98,8 +111,8 @@
     <SUITE FILE_PATH="coverage/image_caption$unzip_dataset.coverage" NAME="unzip_dataset 覆盖结果" MODIFIED="1764481641084" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
     <SUITE FILE_PATH="coverage/image_caption$get_deepfashion_data.coverage" NAME="get_deepfashion_data 覆盖结果" MODIFIED="1763723197858" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
     <SUITE FILE_PATH="coverage/image_caption$test_deepfashion.coverage" NAME="test_deepfashion 覆盖结果" MODIFIED="1763732004131" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
-    <SUITE FILE_PATH="coverage/image_caption$inference.coverage" NAME="inference 覆盖结果" MODIFIED="1764419023283" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
     <SUITE FILE_PATH="coverage/image_caption$test_model.coverage" NAME="test_model 覆盖结果" MODIFIED="1764482750413" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
+    <SUITE FILE_PATH="coverage/image_caption$inference.coverage" NAME="inference 覆盖结果" MODIFIED="1767790978292" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/scripts" />
     <SUITE FILE_PATH="coverage/image_caption$prepare_data.coverage" NAME="prepare_data 覆盖结果" MODIFIED="1764481729890" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
     <SUITE FILE_PATH="coverage/image_caption$eval_metrics.coverage" NAME="eval_metrics 覆盖结果" MODIFIED="1764751586697" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
     <SUITE FILE_PATH="coverage/image_caption$process_deepfashion.coverage" NAME="process_deepfashion 覆盖结果" MODIFIED="1763721641276" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />

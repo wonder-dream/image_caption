@@ -1,60 +1,59 @@
 # Image Caption - 图像描述生成项目
 
-基于 DeepFashion-MultiModal 数据集的图像描述生成模型。
+基于 DeepFashion-MultiModal 数据集的图像描述生成模型，实现了 ViT-Transformer 和 Grid-Transformer 两种架构。
 
 ## 📁 项目结构
 
-```text
+```
 image_caption/
 ├── models/                          # 模型定义
-│   ├── __init__.py
 │   ├── vit_transformer_model.py     # ViT + Transformer 模型
-│   └── grid_transformer_model.py    # Grid + Transformer 模型
+│   └── grid_transformer_model.py    # Grid (CNN) + Transformer 模型
 │
 ├── scripts/                         # 训练和推理脚本
-│   ├── __init__.py
-│   ├── train_vit_transformer.py              # ViT 模型基础训练 (交叉熵)
-│   ├── train_grid_transformer.py             # Grid 模型基础训练 (交叉熵)
-│   ├── train_vit_transformer_optimized.py    # ViT 模型优化版训练
-│   ├── train_grid_transformer_optimized.py   # Grid 模型优化版训练
-│   ├── train_vit_transformer_scst_optimized.py   # ViT SCST+优化 训练
-│   ├── train_grid_transformer_scst_optimized.py  # Grid SCST+优化 训练
-│   ├── inference_vit_transformer.py          # ViT 模型推理脚本
-│   ├── inference_grid_transformer.py         # Grid 模型推理脚本
-│   ├── inference.py                          # 通用推理脚本
-│   └── test_model.py                         # 模型测试脚本
+│   ├── train_vit_transformer.py              # ViT 基础训练 (交叉熵)
+│   ├── train_grid_transformer.py             # Grid 基础训练 (交叉熵)
+│   ├── train_vit_transformer_optimized.py    # ViT 优化版训练
+│   ├── train_grid_transformer_optimized.py   # Grid 优化版训练
+│   ├── train_vit_transformer_scst_optimized.py   # ViT SCST 强化学习训练
+│   ├── train_grid_transformer_scst_optimized.py  # Grid SCST 强化学习训练
+│   ├── evaluate_model.py            # 模型评估脚本 (CIDEr/METEOR/ROUGE-L)
+│   └── inference.py                 # 单图推理脚本
 │
 ├── utils/                           # 工具模块
-│   ├── __init__.py
-│   ├── deepfashion_dataset.py       # 数据集类和数据加载器
-│   ├── prepare_data.py              # 数据预处理脚本
-│   ├── unzip_dataset.py             # 数据集解压脚本
-│   ├── eval_metrics.py              # 评测指标 (CIDEr, METEOR, BLEU)
-│   ├── scst_loss.py                 # SCST 强化学习损失函数
-│   └── optimizations.py             # 优化工具 (Label Smoothing, EMA, etc.)
+│   ├── deepfashion_dataset.py       # 数据集类
+│   ├── prepare_data.py              # 数据预处理
+│   ├── unzip_dataset.py             # 数据集解压
+│   ├── eval_metrics.py              # 评测指标
+│   ├── scst_loss.py                 # SCST 损失函数
+│   └── optimizations.py             # 优化工具 (Label Smoothing, EMA等)
 │
 ├── data/                            # 数据目录
 │   ├── images/                      # 图像文件夹
-│   ├── vocab.json                   # 词典文件
+│   ├── vocab.json                   # 词典
 │   ├── train_data.json              # 训练集
 │   ├── val_data.json                # 验证集
 │   └── test_data.json               # 测试集
 │
 ├── checkpoints/                     # 模型检查点
 │   ├── vit_transformer/             # ViT 基础模型
-│   ├── vit_transformer_optimized/   # ViT 优化版模型
-│   ├── vit_transformer_scst_opt/    # ViT SCST+优化模型
 │   ├── grid_transformer/            # Grid 基础模型
-│   ├── grid_transformer_optimized/  # Grid 优化版模型
-│   └── grid_transformer_scst_opt/   # Grid SCST+优化模型
+│   ├── vit_transformer_optimized/   # ViT 优化版
+│   └── grid_transformer_optimized/  # Grid 优化版
 │
-├── 模型完成总结.md                   # 项目总结文档
-└── README.md                        # 本文件
+├── requirements.txt                 # 依赖
+└── README.md
 ```
 
 ## 🚀 快速开始
 
-### 1. 数据准备
+### 1. 安装依赖
+
+```bash
+pip install -r requirements.txt
+```
+
+### 2. 数据准备
 
 ```bash
 # 解压数据集
@@ -64,115 +63,133 @@ python utils/unzip_dataset.py
 python utils/prepare_data.py
 ```
 
-### 2. 训练模型
+### 3. 训练模型
 
 #### 基础训练（交叉熵）
 ```bash
-# 训练 ViT + Transformer 模型
+# ViT + Transformer
 python scripts/train_vit_transformer.py
 
-# 训练 Grid + Transformer 模型
+# Grid + Transformer
 python scripts/train_grid_transformer.py
 ```
 
 #### 优化版训练（推荐）
 ```bash
-# ViT 模型优化版训练
+# ViT 优化版
 python scripts/train_vit_transformer_optimized.py
 
-# Grid 模型优化版训练
+# Grid 优化版
 python scripts/train_grid_transformer_optimized.py
 ```
 
-### 3. 强化学习微调（SCST + 优化）
-
-SCST (Self-Critical Sequence Training) 直接优化评测指标，需要先完成优化版训练。
-
+#### SCST 强化学习微调
+需要先完成优化版训练，再进行 SCST 微调：
 ```bash
-# ViT 模型 SCST+优化 训练
+# ViT SCST
 python scripts/train_vit_transformer_scst_optimized.py
 
-# Grid 模型 SCST+优化 训练
+# Grid SCST  
 python scripts/train_grid_transformer_scst_optimized.py
 ```
 
-### 4. 推理测试
+### 4. 模型评估
+
+在测试集上评估模型，输出 CIDEr、METEOR、ROUGE-L 指标：
 
 ```bash
-# ViT 模型推理
-python scripts/inference_vit_transformer.py
+# 评估 Grid 模型
+python scripts/evaluate_model.py --checkpoint checkpoints/grid_transformer/best_model.pth --model_type grid
 
-# Grid 模型推理
-python scripts/inference_grid_transformer.py
+# 评估 ViT 模型
+python scripts/evaluate_model.py --checkpoint checkpoints/vit_transformer/best_model.pth --model_type vit
+
+# 评估优化版模型
+python scripts/evaluate_model.py --checkpoint checkpoints/grid_transformer_optimized/best_model.pth --model_type grid
 ```
 
-## 🧠 训练策略
+### 5. 单图推理
 
-### 三阶段训练流程
+对单张图片生成描述：
+
+```bash
+# 使用 Grid 模型
+python scripts/inference.py --image path/to/image.jpg --checkpoint checkpoints/grid_transformer/best_model.pth --model_type grid
+
+# 使用 Beam Search
+python scripts/inference.py --image path/to/image.jpg --checkpoint checkpoints/vit_transformer/best_model.pth --model_type vit --method beam_search --beam_size 5
+
+# 保存可视化结果
+python scripts/inference.py --image path/to/image.jpg --checkpoint checkpoints/grid_transformer/best_model.pth --model_type grid --save output.png
+```
+
+## 🧠 模型架构
+
+### ViT + Transformer
+- **编码器**: Vision Transformer (ViT-B/16)，将图像分割为 16x16 patches
+- **解码器**: 6 层 Transformer Decoder
+- **特点**: 全局注意力，适合捕捉图像整体语义
+
+### Grid + Transformer  
+- **编码器**: ResNet-101 CNN，提取 7x7 网格特征
+- **解码器**: 6 层 Transformer Decoder
+- **特点**: 保留空间信息，渐进式 CNN 解冻
+
+## 🔧 优化技术
+
+| 技术 | 说明 | 配置 |
+|------|------|------|
+| Label Smoothing | 软标签，防止过拟合 | `label_smoothing=0.1` |
+| Warmup + Cosine LR | 学习率预热 + 余弦退火 | `warmup_steps=300` |
+| 梯度裁剪 | 防止梯度爆炸 | `gradient_clip=5.0` |
+| EMA | 指数移动平均 | `ema_decay=0.999` |
+| R-Drop | 一致性正则化 | `use_r_drop=True` |
+| 早停 | 防止过拟合 | `patience=7` |
+
+## 📊 训练流程
 
 ```
-阶段一: 交叉熵预训练 (XE)
-         ↓
-阶段二: 优化版训练 (XE + 各种优化技术)
-         ↓
-阶段三: 强化学习微调 (SCST)
+┌─────────────────────────────────────────────────────────┐
+│                    三阶段训练                            │
+├─────────────────────────────────────────────────────────┤
+│  阶段一: 基础训练 (XE)                                   │
+│    └─ 交叉熵损失，快速收敛                               │
+│                    ↓                                     │
+│  阶段二: 优化版训练 (XE + Optimizations)                 │
+│    └─ Label Smoothing + Warmup + EMA + ...              │
+│                    ↓                                     │
+│  阶段三: SCST 微调 (RL)                                  │
+│    └─ 直接优化 CIDEr，进一步提升                         │
+└─────────────────────────────────────────────────────────┘
 ```
 
-### 优化技术详解
+## 📈 SCST 原理
 
-| 优化技术 | 作用 | 配置参数 |
-|---------|------|----------|
-| **Label Smoothing** | 防止过拟合，提高泛化 | `label_smoothing=0.1` |
-| **Warmup + Cosine LR** | 稳定训练，更好收敛 | `warmup_steps=2000` |
-| **数据增强** | 增加数据多样性 | `use_data_augmentation=True` |
-| **EMA** | 参数平滑，提升泛化 | `use_ema=True, ema_decay=0.999` |
-| **梯度裁剪** | 防止梯度爆炸 | `gradient_clip=1.0` |
-| **早停机制** | 防止过拟合 | `patience=7` |
-| **R-Drop** | 一致性正则化 | `use_r_drop=True` |
-| **Weight Decay** | L2 正则化 | `weight_decay=0.01` |
+Self-Critical Sequence Training 使用强化学习直接优化评测指标：
 
-### SCST 原理
-
-$$L_{RL} = -\mathbb{E}_{w^s \sim p_\theta}[(r(w^s) - r(\hat{w}))\log p_\theta(w^s)]$$
+$$L_{RL} = -\mathbb{E}_{w^s \sim p_\theta}\left[(r(w^s) - r(\hat{w}))\log p_\theta(w^s)\right]$$
 
 - $w^s$: 采样生成的序列
-- $\hat{w}$: Greedy 解码的序列（作为 baseline）
-- $r(\cdot)$: 奖励函数（如 CIDEr 分数）
+- $\hat{w}$: Greedy 解码的序列（baseline）
+- $r(\cdot)$: CIDEr 奖励
 
-## 📊 模型性能
-
-| 模型 | 训练方式 | CIDEr | METEOR | ROUGE-L |
-|------|----------|-------|--------|---------|
-| ViT + Transformer | XE | ~1.2 | - | - |
-| ViT + Transformer | XE + 优化 | ~1.3 | - | - |
-| ViT + Transformer | XE + SCST | ~1.5+ | - | - |
-| Grid + Transformer | XE | - | - | - |
-| Grid + Transformer | XE + 优化 | - | - | - |
-| Grid + Transformer | XE + SCST | - | - | - |
-
-## ⚙️ 优化配置示例
-
-```python
-config = {
-    # 优化策略
-    "label_smoothing": 0.1,        # Label Smoothing
-    "warmup_steps": 2000,          # Warmup 步数
-    "gradient_clip": 1.0,          # 梯度裁剪
-    "use_data_augmentation": True, # 数据增强
-    "use_ema": True,               # EMA
-    "ema_decay": 0.999,
-    "weight_decay": 0.01,          # L2 正则化
-    "patience": 7,                 # 早停 patience
-}
-```
-
-## 🔧 依赖
+## ⚙️ 环境要求
 
 - Python 3.8+
 - PyTorch 2.0+
-- torchvision
-- pycocotools
-- pycocoevalcap
-- tqdm
-- matplotlib
-- Pillow
+- CUDA 11.8+ (GPU 训练)
+
+## 📦 依赖安装
+
+```bash
+# 基础依赖
+pip install torch torchvision
+pip install Pillow numpy tqdm matplotlib tensorboard
+
+# 评测指标
+pip install pycocoevalcap
+```
+
+## 📝 License
+
+MIT License

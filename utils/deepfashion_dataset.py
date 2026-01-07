@@ -155,6 +155,9 @@ class DeepFashionDataset(Dataset):
         assert self.split in {'train', 'val', 'test'}
         self.max_len = max_len
         
+        # 获取数据目录的绝对路径（用于解析图片路径）
+        self.data_dir = os.path.dirname(os.path.abspath(dataset_path))
+        
         # 载入数据集
         print(f"正在加载 {split} 数据集...")
         with open(dataset_path, 'r', encoding='utf-8') as f:
@@ -180,8 +183,18 @@ class DeepFashionDataset(Dataset):
             caption：编码后的caption张量
             caplen：caption的实际长度
         """
+        # 获取图片路径并转换为绝对路径
+        img_path = self.data['IMAGES'][i]
+        
+        # 如果是相对路径，基于数据目录解析
+        if not os.path.isabs(img_path):
+            # 处理类似 'data/images/xxx.jpg' 的路径，提取 'images/xxx.jpg' 部分
+            if img_path.startswith('data/') or img_path.startswith('data\\'):
+                img_path = img_path[5:]  # 去掉 'data/' 前缀
+            img_path = os.path.join(self.data_dir, img_path)
+        
         # 读取并转换图像
-        img = Image.open(self.data['IMAGES'][i]).convert('RGB')
+        img = Image.open(img_path).convert('RGB')
         if self.transform is not None:
             img = self.transform(img)
         

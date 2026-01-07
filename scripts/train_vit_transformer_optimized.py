@@ -339,6 +339,12 @@ def validate(model, val_loader, criterion, device, vocab, ema=None):
                     if idx not in [vocab["<start>"], vocab["<pad>"]]:
                         pred_words.append(idx2word[idx])
                 res[img_id] = [" ".join(pred_words)]
+                
+                # 打印前3个样本的生成结果（仅第一个batch）
+                if i == 0 and j < 3:
+                    print(f"\n[样本 {j}]")
+                    print(f"  参考: {gts[img_id][0][:100]}...")
+                    print(f"  生成: {res[img_id][0][:100]}...")
 
     # 恢复原始参数
     if ema is not None:
@@ -566,7 +572,8 @@ def train_optimized(config):
     print("\n在测试集上评估最佳模型...")
     checkpoint = torch.load(
         os.path.join(config["checkpoint_dir"], "best_model.pth"),
-        map_location=device
+        map_location=device,
+        weights_only=False
     )
     model.load_state_dict(checkpoint["model_state_dict"])
 
@@ -603,22 +610,22 @@ if __name__ == "__main__":
         
         # 训练
         "num_epochs": 30,
-        "learning_rate": 1e-4,  # 降低学习率，更稳定
-        "min_lr": 1e-7,
+        "learning_rate": 1e-4,  # 与原始版相同
+        "min_lr": 1e-6,  # 提高最小学习率
         "weight_decay": 0.01,
-        "finetune_encoder_after_epoch": -1,  # 禁用微调，先只训练 Decoder
+        "finetune_encoder_after_epoch": -1,  # 禁用微调
         
-        # 优化策略
+        # 优化策略 - 保守设置
         "label_smoothing": 0.1,        # Label Smoothing
-        "warmup_steps": 1000,          # 减少 Warmup 步数
-        "gradient_clip": 1.0,          # 梯度裁剪
-        "use_data_augmentation": True, # 数据增强
-        "use_ema": True,               # EMA
-        "ema_decay": 0.9999,           # 更高的 decay
-        "use_r_drop": False,           # R-Drop (可选，会增加训练时间)
+        "warmup_steps": 300,           # 大幅减少 Warmup（约半个 epoch）
+        "gradient_clip": 5.0,          # 与原始版相同
+        "use_data_augmentation": False, # 先禁用数据增强
+        "use_ema": False,              # 先禁用 EMA
+        "ema_decay": 0.9999,
+        "use_r_drop": False,
         "r_drop_alpha": 1.0,
         "gradient_accumulation_steps": 1,
-        "patience": 10,                # 增加早停 patience
+        "patience": 10,
         
         # 评估和保存 - 使用绝对路径
         "eval_every": 1,
