@@ -21,11 +21,11 @@ def download_from_modelscope(model_name, save_dir):
     """
     from modelscope import snapshot_download
     
-    # ModelScope 上的模型名称映射
+    # ModelScope 上的模型名称映射 (使用实际存在的模型)
     modelscope_map = {
-        'Salesforce/blip-image-captioning-base': 'AI-ModelScope/blip-image-captioning-base',
-        'Salesforce/blip-image-captioning-large': 'AI-ModelScope/blip-image-captioning-large',
-        'Salesforce/blip2-opt-2.7b': 'AI-ModelScope/blip2-opt-2.7b',
+        'Salesforce/blip-image-captioning-base': 'iic/blip-image-captioning-base',
+        'Salesforce/blip-image-captioning-large': 'iic/blip-image-captioning-large',
+        'Salesforce/blip2-opt-2.7b': 'iic/blip2-opt-2.7b',
     }
     
     ms_model_name = modelscope_map.get(model_name)
@@ -49,6 +49,56 @@ def download_from_modelscope(model_name, save_dir):
         return save_path
     except Exception as e:
         print(f"ModelScope 下载失败: {e}")
+        return None
+
+
+def download_from_hf_cli(model_name, save_dir, use_mirror=True):
+    """
+    使用 huggingface-cli 下载模型 (配合镜像，国内推荐)
+    """
+    import subprocess
+    import os
+    
+    save_path = os.path.join(save_dir, model_name.replace('/', '_'))
+    os.makedirs(save_path, exist_ok=True)
+    
+    print(f"\n{'='*60}")
+    print(f"使用 huggingface-cli 下载: {model_name}")
+    print(f"保存路径: {save_path}")
+    print(f"{'='*60}\n")
+    
+    # 设置环境变量
+    env = os.environ.copy()
+    if use_mirror:
+        env['HF_ENDPOINT'] = 'https://hf-mirror.com'
+        print("使用镜像: https://hf-mirror.com")
+    
+    try:
+        # 使用 huggingface-cli download
+        cmd = [
+            'huggingface-cli', 'download',
+            model_name,
+            '--local-dir', save_path,
+            '--local-dir-use-symlinks', 'False'
+        ]
+        
+        print(f"执行命令: {' '.join(cmd)}")
+        result = subprocess.run(cmd, env=env, capture_output=True, text=True)
+        
+        if result.returncode == 0:
+            print(f"\n✅ 下载完成: {save_path}")
+            return save_path
+        else:
+            print(f"下载失败: {result.stderr}")
+            return None
+            
+    except FileNotFoundError:
+        print("huggingface-cli 未安装，正在安装...")
+        subprocess.run(['pip', 'install', '-U', 'huggingface_hub'])
+        # 递归调用重试
+        return download_from_hf_cli(model_name, save_dir, use_mirror)
+    except Exception as e:
+        print(f"下载失败: {e}")
         return None
 
 
@@ -108,20 +158,31 @@ def download_from_huggingface(model_name, save_dir, use_mirror=False):
         return None
 
 
-def download_blip_model(model_name, save_dir, source='auto', use_mirror=False):
+def download_blip_model(model_name, save_dir, source='auto', use_mirror=True):
     """
     下载 BLIP 预训练模型
     
     参数:
         model_name: 模型名称
         save_dir: 保存目录
-        source: 下载源 ('modelscope', 'huggingface', 'auto')
+        source: 下载源 ('modelscope', 'huggingface', 'hf-cli', 'auto')
         use_mirror: HuggingFace 是否使用镜像
     """
     os.makedirs(save_dir, exist_ok=True)
     save_path = None
     
-    if source == 'modelscope' or source == 'auto':
+    # 方法1: 使用 huggingface-cli + 镜像 (国内最稳定)
+    if source == 'hf-cli' or source == 'auto':
+        print("\n尝试使用 huggingface-cli + 镜像下载 (推荐)...")
+        try:
+            save_path = download_from_hf_cli(model_name, save_dir, use_mirror=True)
+        except Exception as e:
+            print(f"huggingface-cli 下载失败: {e}")
+            if source == 'hf-cli':
+                raise
+    
+    # 方法2: ModelScope
+    if save_path is None and (source == 'modelscope' or source == 'auto'):
         print("\n尝试从 ModelScope (阿里云魔搭) 下载...")
         try:
             save_path = download_from_modelscope(model_name, save_dir)
@@ -134,6 +195,7 @@ def download_blip_model(model_name, save_dir, source='auto', use_mirror=False):
             if source == 'modelscope':
                 raise
     
+    # 方法3: 直接使用 transformers 从 HuggingFace 下载
     if save_path is None and (source == 'huggingface' or source == 'auto'):
         print("\n尝试从 HuggingFace 下载...")
         save_path = download_from_huggingface(model_name, save_dir, use_mirror)
@@ -256,8 +318,8 @@ def main():
     )
     parser.add_argument(
         '--source', type=str, default='auto',
-        choices=['auto', 'modelscope', 'huggingface'],
-        help='下载源: auto(自动), modelscope(阿里云魔搭), huggingface'
+        choices=['auto', 'hf-cli', 'modelscope', 'huggingface'],
+        help='下载源: auto(自动), hf-cli(推荐), modelscope(阿里云魔搭), huggingface'
     )
     parser.add_argument(
         '--mirror', action='store_true',
