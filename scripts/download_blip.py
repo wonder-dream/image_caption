@@ -3,8 +3,10 @@
 """
 BLIP 预训练模型下载脚本
 
-自动从 HuggingFace 下载 BLIP 模型用于图像描述任务微调
-支持 Linux 服务器环境，可离线使用
+支持多种下载方式，适合中国大陆网络环境：
+1. ModelScope (阿里云魔搭) - 国内最稳定
+2. HuggingFace 镜像 (hf-mirror.com)
+3. 原版 HuggingFace
 """
 
 import os
@@ -12,16 +14,49 @@ import argparse
 from pathlib import Path
 
 
-def download_blip_model(model_name, save_dir, use_mirror=False):
+def download_from_modelscope(model_name, save_dir):
     """
-    下载 BLIP 预训练模型
+    从 ModelScope (阿里云魔搭) 下载模型
+    国内速度最快最稳定
+    """
+    from modelscope import snapshot_download
     
-    参数:
-        model_name: 模型名称
-        save_dir: 保存目录
-        use_mirror: 是否使用国内镜像 (hf-mirror.com)
+    # ModelScope 上的模型名称映射
+    modelscope_map = {
+        'Salesforce/blip-image-captioning-base': 'AI-ModelScope/blip-image-captioning-base',
+        'Salesforce/blip-image-captioning-large': 'AI-ModelScope/blip-image-captioning-large',
+        'Salesforce/blip2-opt-2.7b': 'AI-ModelScope/blip2-opt-2.7b',
+    }
+    
+    ms_model_name = modelscope_map.get(model_name)
+    if not ms_model_name:
+        print(f"ModelScope 暂不支持: {model_name}")
+        return None
+    
+    print(f"\n{'='*60}")
+    print(f"从 ModelScope 下载: {ms_model_name}")
+    print(f"{'='*60}\n")
+    
+    save_path = os.path.join(save_dir, model_name.replace('/', '_'))
+    
+    try:
+        model_dir = snapshot_download(
+            ms_model_name,
+            cache_dir=save_dir,
+            local_dir=save_path
+        )
+        print(f"\n✅ 下载完成: {model_dir}")
+        return save_path
+    except Exception as e:
+        print(f"ModelScope 下载失败: {e}")
+        return None
+
+
+def download_from_huggingface(model_name, save_dir, use_mirror=False):
     """
-    # 设置镜像 (可选，国内服务器推荐)
+    从 HuggingFace 下载模型
+    """
+    # 设置镜像
     if use_mirror:
         os.environ['HF_ENDPOINT'] = 'https://hf-mirror.com'
         print("使用 HuggingFace 镜像: https://hf-mirror.com")
@@ -33,13 +68,12 @@ def download_blip_model(model_name, save_dir, use_mirror=False):
     os.makedirs(save_path, exist_ok=True)
     
     print(f"\n{'='*60}")
-    print(f"下载模型: {model_name}")
+    print(f"从 HuggingFace 下载: {model_name}")
     print(f"保存路径: {save_path}")
     print(f"{'='*60}\n")
     
     try:
         if 'blip2' in model_name.lower():
-            # BLIP-2 模型
             print("正在下载 BLIP-2 Processor...")
             processor = Blip2Processor.from_pretrained(model_name)
             processor.save_pretrained(save_path)
@@ -51,7 +85,6 @@ def download_blip_model(model_name, save_dir, use_mirror=False):
             )
             model.save_pretrained(save_path)
         else:
-            # BLIP 模型
             print("正在下载 BLIP Processor...")
             processor = BlipProcessor.from_pretrained(model_name)
             processor.save_pretrained(save_path)
@@ -63,7 +96,6 @@ def download_blip_model(model_name, save_dir, use_mirror=False):
         print(f"\n✅ 模型下载完成!")
         print(f"保存位置: {save_path}")
         
-        # 统计文件大小
         total_size = sum(
             f.stat().st_size for f in Path(save_path).rglob('*') if f.is_file()
         )
@@ -72,12 +104,71 @@ def download_blip_model(model_name, save_dir, use_mirror=False):
         return save_path
         
     except Exception as e:
-        print(f"\n❌ 下载失败: {e}")
-        print("\n可能的解决方案:")
-        print("1. 检查网络连接")
-        print("2. 使用镜像: --mirror")
-        print("3. 设置代理: export https_proxy=http://your_proxy:port")
-        raise
+        print(f"\n❌ HuggingFace 下载失败: {e}")
+        return None
+
+
+def download_blip_model(model_name, save_dir, source='auto', use_mirror=False):
+    """
+    下载 BLIP 预训练模型
+    
+    参数:
+        model_name: 模型名称
+        save_dir: 保存目录
+        source: 下载源 ('modelscope', 'huggingface', 'auto')
+        use_mirror: HuggingFace 是否使用镜像
+    """
+    os.makedirs(save_dir, exist_ok=True)
+    save_path = None
+    
+    if source == 'modelscope' or source == 'auto':
+        print("\n尝试从 ModelScope (阿里云魔搭) 下载...")
+        try:
+            save_path = download_from_modelscope(model_name, save_dir)
+        except ImportError:
+            print("ModelScope 未安装，请运行: pip install modelscope")
+            if source == 'modelscope':
+                raise
+        except Exception as e:
+            print(f"ModelScope 下载失败: {e}")
+            if source == 'modelscope':
+                raise
+    
+    if save_path is None and (source == 'huggingface' or source == 'auto'):
+        print("\n尝试从 HuggingFace 下载...")
+        save_path = download_from_huggingface(model_name, save_dir, use_mirror)
+    
+    if save_path is None:
+        print("\n" + "="*60)
+        print("❌ 自动下载失败！请尝试手动下载：")
+        print("="*60)
+        print_manual_download_guide(model_name, save_dir)
+        raise RuntimeError("下载失败")
+    
+    return save_path
+
+
+def print_manual_download_guide(model_name, save_dir):
+    """打印手动下载指南"""
+    print(f"""
+方法1: 使用 ModelScope (推荐)
+    pip install modelscope
+    然后重新运行此脚本: python download_blip.py --source modelscope
+
+方法2: 使用 huggingface-cli + 镜像
+    export HF_ENDPOINT=https://hf-mirror.com
+    pip install huggingface_hub
+    huggingface-cli download {model_name} --local-dir {save_dir}/{model_name.replace('/', '_')}
+
+方法3: 手动下载
+    1. 访问 https://hf-mirror.com/{model_name}
+    2. 下载所有文件到 {save_dir}/{model_name.replace('/', '_')}/
+    3. 确保包含: config.json, pytorch_model.bin 或 model.safetensors
+
+方法4: 使用学术网络/VPN
+    export https_proxy=http://your_proxy:port
+    python download_blip.py --source huggingface
+""")
 
 
 def verify_model(model_path, model_type='blip'):
@@ -136,24 +227,21 @@ def verify_model(model_path, model_type='blip'):
 
 def main():
     parser = argparse.ArgumentParser(
-        description='BLIP 预训练模型下载脚本',
+        description='BLIP 预训练模型下载脚本 (支持中国大陆网络)',
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 示例:
-  # 下载 BLIP-base (推荐，约 1GB)
-  python download_blip.py --model blip-base
+  # 从 ModelScope 下载 (国内推荐，最稳定)
+  python download_blip.py --model blip-base --source modelscope
   
-  # 下载 BLIP-large (约 2GB)
-  python download_blip.py --model blip-large
+  # 从 HuggingFace 镜像下载
+  python download_blip.py --model blip-base --source huggingface --mirror
   
-  # 下载 BLIP-2 (约 15GB，需要更多显存)
-  python download_blip.py --model blip2
+  # 自动选择下载源 (先尝试 ModelScope)
+  python download_blip.py --model blip-base --source auto
   
-  # 使用国内镜像下载
-  python download_blip.py --model blip-base --mirror
-  
-  # 指定保存路径
-  python download_blip.py --model blip-base --save_dir /data/models
+  # 下载 BLIP-large
+  python download_blip.py --model blip-large --source modelscope
         """
     )
     
@@ -167,8 +255,13 @@ def main():
         help='模型保存目录 (默认: pretrained_models)'
     )
     parser.add_argument(
+        '--source', type=str, default='auto',
+        choices=['auto', 'modelscope', 'huggingface'],
+        help='下载源: auto(自动), modelscope(阿里云魔搭), huggingface'
+    )
+    parser.add_argument(
         '--mirror', action='store_true',
-        help='使用 HuggingFace 国内镜像 (hf-mirror.com)'
+        help='HuggingFace 使用国内镜像 (hf-mirror.com)'
     )
     parser.add_argument(
         '--verify', action='store_true',
@@ -188,17 +281,20 @@ def main():
     model_name = model_map[args.model]
     
     print("="*60)
-    print("BLIP 预训练模型下载器")
+    print("BLIP 预训练模型下载器 (中国大陆优化版)")
     print("="*60)
     print(f"模型: {args.model} ({model_name})")
     print(f"保存目录: {args.save_dir}")
-    print(f"使用镜像: {args.mirror}")
+    print(f"下载源: {args.source}")
+    if args.source == 'huggingface':
+        print(f"使用镜像: {args.mirror}")
     print()
     
     # 下载模型
     save_path = download_blip_model(
         model_name=model_name,
         save_dir=args.save_dir,
+        source=args.source,
         use_mirror=args.mirror
     )
     
