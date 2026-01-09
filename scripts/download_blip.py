@@ -54,50 +54,56 @@ def download_from_modelscope(model_name, save_dir):
 
 def download_from_hf_cli(model_name, save_dir, use_mirror=True):
     """
-    使用 huggingface-cli 下载模型 (配合镜像，国内推荐)
+    使用 huggingface_hub Python API 下载模型 (国内推荐)
     """
-    import subprocess
-    import os
+    import sys
     
     save_path = os.path.join(save_dir, model_name.replace('/', '_'))
     os.makedirs(save_path, exist_ok=True)
     
     print(f"\n{'='*60}")
-    print(f"使用 huggingface-cli 下载: {model_name}")
+    print(f"使用 huggingface_hub 下载: {model_name}")
     print(f"保存路径: {save_path}")
     print(f"{'='*60}\n")
     
-    # 设置环境变量
-    env = os.environ.copy()
+    # 设置镜像
     if use_mirror:
-        env['HF_ENDPOINT'] = 'https://hf-mirror.com'
+        os.environ['HF_ENDPOINT'] = 'https://hf-mirror.com'
         print("使用镜像: https://hf-mirror.com")
     
     try:
-        # 使用 huggingface-cli download
-        cmd = [
-            'huggingface-cli', 'download',
-            model_name,
-            '--local-dir', save_path,
-            '--local-dir-use-symlinks', 'False'
-        ]
+        from huggingface_hub import snapshot_download
         
-        print(f"执行命令: {' '.join(cmd)}")
-        result = subprocess.run(cmd, env=env, capture_output=True, text=True)
+        print("正在下载模型文件...")
+        downloaded_path = snapshot_download(
+            repo_id=model_name,
+            local_dir=save_path,
+            local_dir_use_symlinks=False,
+            resume_download=True,  # 支持断点续传
+        )
         
-        if result.returncode == 0:
-            print(f"\n✅ 下载完成: {save_path}")
-            return save_path
-        else:
-            print(f"下载失败: {result.stderr}")
-            return None
-            
-    except FileNotFoundError:
-        print("huggingface-cli 未安装，正在安装...")
-        subprocess.run(['pip', 'install', '-U', 'huggingface_hub'])
-        # 递归调用重试
-        return download_from_hf_cli(model_name, save_dir, use_mirror)
+        print(f"\n✅ 下载完成: {downloaded_path}")
+        return save_path
+        
+    except ImportError:
+        print("huggingface_hub 未安装，正在安装...")
+        import subprocess
+        subprocess.run([sys.executable, '-m', 'pip', 'install', '-U', 'huggingface_hub'])
+        
+        # 重新导入并下载
+        from huggingface_hub import snapshot_download
+        downloaded_path = snapshot_download(
+            repo_id=model_name,
+            local_dir=save_path,
+            local_dir_use_symlinks=False,
+            resume_download=True,
+        )
+        print(f"\n✅ 下载完成: {downloaded_path}")
+        return save_path
+        
     except Exception as e:
+        print(f"下载失败: {e}")
+        return None
         print(f"下载失败: {e}")
         return None
 
