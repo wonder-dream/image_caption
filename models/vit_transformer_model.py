@@ -273,7 +273,7 @@ class ViTTransformerCaptioning(nn.Module):
         
         return mask
     
-    def generate(self, images, start_token, end_token, max_len=50, method='greedy'):
+    def generate(self, images, start_token, end_token, max_len=50, method='greedy', beam_size=5):
         """
         生成图像描述（推理时使用）
         
@@ -283,13 +283,14 @@ class ViTTransformerCaptioning(nn.Module):
             end_token: 结束标记的索引
             max_len: 最大生成长度
             method: 'greedy' 或 'beam_search'
+            beam_size: beam search 的宽度 (仅在 method='beam_search' 时有效)
         返回:
             captions: (batch_size, seq_len) - 生成的caption序列
         """
         if method == 'greedy':
             return self._greedy_search(images, start_token, end_token, max_len)
         elif method == 'beam_search':
-            return self._beam_search(images, start_token, end_token, max_len, beam_size=5)
+            return self._beam_search(images, start_token, end_token, max_len, beam_size=beam_size)
         else:
             raise ValueError(f"Unknown generation method: {method}")
     
