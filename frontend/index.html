@@ -1,0 +1,542 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>图像描述生成</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            text-align: center;
+            color: white;
+            margin-bottom: 30px;
+            font-size: 2rem;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
+        }
+
+        .card {
+            background: white;
+            border-radius: 16px;
+            padding: 30px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+        }
+
+        .section {
+            margin-bottom: 25px;
+        }
+
+        .section-title {
+            font-size: 1rem;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 10px;
+        }
+
+        /* 模型选择 */
+        .model-select {
+            width: 100%;
+            padding: 12px 15px;
+            font-size: 1rem;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            background: white;
+            cursor: pointer;
+            transition: border-color 0.3s;
+        }
+
+        .model-select:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        /* 解码方式 */
+        .method-group {
+            display: flex;
+            gap: 15px;
+        }
+
+        .method-option {
+            flex: 1;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .method-option:hover {
+            border-color: #667eea;
+        }
+
+        .method-option.active {
+            border-color: #667eea;
+            background: #667eea;
+            color: white;
+        }
+
+        /* 图片上传区域 */
+        .upload-area {
+            border: 3px dashed #e0e0e0;
+            border-radius: 12px;
+            padding: 40px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+            background: #fafafa;
+        }
+
+        .upload-area:hover {
+            border-color: #667eea;
+            background: #f0f0ff;
+        }
+
+        .upload-area.dragover {
+            border-color: #667eea;
+            background: #e8e8ff;
+        }
+
+        .upload-icon {
+            font-size: 3rem;
+            margin-bottom: 15px;
+        }
+
+        .upload-text {
+            color: #666;
+            font-size: 1rem;
+        }
+
+        .upload-hint {
+            color: #999;
+            font-size: 0.85rem;
+            margin-top: 8px;
+        }
+
+        #fileInput {
+            display: none;
+        }
+
+        /* 预览图 */
+        .preview-container {
+            display: none;
+            margin-top: 20px;
+        }
+
+        .preview-container.show {
+            display: block;
+        }
+
+        .preview-image {
+            max-width: 100%;
+            max-height: 300px;
+            border-radius: 8px;
+            display: block;
+            margin: 0 auto;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+
+        /* 生成按钮 */
+        .generate-btn {
+            width: 100%;
+            padding: 15px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: white;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+            margin-top: 20px;
+        }
+
+        .generate-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        .generate-btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .generate-btn.loading {
+            position: relative;
+            color: transparent;
+        }
+
+        .generate-btn.loading::after {
+            content: '';
+            position: absolute;
+            width: 24px;
+            height: 24px;
+            top: 50%;
+            left: 50%;
+            margin-left: -12px;
+            margin-top: -12px;
+            border: 3px solid white;
+            border-radius: 50%;
+            border-top-color: transparent;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* 结果展示 */
+        .result-container {
+            display: none;
+            margin-top: 25px;
+            padding: 20px;
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            border-radius: 12px;
+        }
+
+        .result-container.show {
+            display: block;
+        }
+
+        .result-label {
+            font-size: 0.9rem;
+            color: #666;
+            margin-bottom: 8px;
+        }
+
+        .result-caption {
+            font-size: 1.2rem;
+            color: #333;
+            font-weight: 500;
+            line-height: 1.6;
+        }
+
+        .result-meta {
+            margin-top: 15px;
+            font-size: 0.85rem;
+            color: #888;
+        }
+
+        /* 错误提示 */
+        .error-message {
+            display: none;
+            margin-top: 15px;
+            padding: 15px;
+            background: #fee;
+            border: 1px solid #fcc;
+            border-radius: 8px;
+            color: #c00;
+        }
+
+        .error-message.show {
+            display: block;
+        }
+
+        /* 设备信息 */
+        .device-info {
+            text-align: center;
+            margin-top: 20px;
+            font-size: 0.85rem;
+            color: rgba(255,255,255,0.8);
+        }
+
+        .device-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            background: rgba(255,255,255,0.2);
+            border-radius: 20px;
+            margin-left: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🖼️ 图像描述生成</h1>
+        
+        <div class="card">
+            <!-- 模型选择 -->
+            <div class="section">
+                <div class="section-title">选择模型</div>
+                <select id="modelSelect" class="model-select">
+                    <option value="">加载中...</option>
+                </select>
+            </div>
+
+            <!-- 解码方式 -->
+            <div class="section">
+                <div class="section-title">解码方式</div>
+                <div class="method-group">
+                    <div class="method-option active" data-method="greedy">
+                        <strong>Greedy</strong>
+                        <div style="font-size: 0.85rem; color: #888; margin-top: 4px;">速度快</div>
+                    </div>
+                    <div class="method-option" data-method="beam_search">
+                        <strong>Beam Search</strong>
+                        <div style="font-size: 0.85rem; color: #888; margin-top: 4px;">质量高</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 图片上传 -->
+            <div class="section">
+                <div class="section-title">上传图片</div>
+                <div class="upload-area" id="uploadArea">
+                    <div class="upload-icon">📷</div>
+                    <div class="upload-text">点击或拖拽图片到这里</div>
+                    <div class="upload-hint">支持 JPG、PNG 格式</div>
+                </div>
+                <input type="file" id="fileInput" accept="image/*">
+                
+                <div class="preview-container" id="previewContainer">
+                    <img id="previewImage" class="preview-image" alt="预览图">
+                </div>
+            </div>
+
+            <!-- 生成按钮 -->
+            <button class="generate-btn" id="generateBtn" disabled>生成描述</button>
+
+            <!-- 错误提示 -->
+            <div class="error-message" id="errorMessage"></div>
+
+            <!-- 结果展示 -->
+            <div class="result-container" id="resultContainer">
+                <div class="result-label">生成的描述：</div>
+                <div class="result-caption" id="resultCaption"></div>
+                <div class="result-meta" id="resultMeta"></div>
+            </div>
+        </div>
+
+        <div class="device-info">
+            运行设备: <span class="device-badge" id="deviceBadge">检测中...</span>
+        </div>
+    </div>
+
+    <script>
+        // 状态
+        let selectedFile = null;
+        let selectedMethod = 'greedy';
+
+        // DOM 元素
+        const modelSelect = document.getElementById('modelSelect');
+        const uploadArea = document.getElementById('uploadArea');
+        const fileInput = document.getElementById('fileInput');
+        const previewContainer = document.getElementById('previewContainer');
+        const previewImage = document.getElementById('previewImage');
+        const generateBtn = document.getElementById('generateBtn');
+        const errorMessage = document.getElementById('errorMessage');
+        const resultContainer = document.getElementById('resultContainer');
+        const resultCaption = document.getElementById('resultCaption');
+        const resultMeta = document.getElementById('resultMeta');
+        const deviceBadge = document.getElementById('deviceBadge');
+        const methodOptions = document.querySelectorAll('.method-option');
+
+        // 初始化
+        async function init() {
+            await loadModels();
+            await loadDeviceInfo();
+        }
+
+        // 加载模型列表
+        async function loadModels() {
+            try {
+                const response = await fetch('/api/models');
+                const data = await response.json();
+                
+                modelSelect.innerHTML = '';
+                
+                // 按分类分组
+                const categories = {};
+                data.models.forEach(model => {
+                    const cat = model.category || '其他';
+                    if (!categories[cat]) categories[cat] = [];
+                    categories[cat].push(model);
+                });
+                
+                // 创建分组选项
+                for (const [category, models] of Object.entries(categories)) {
+                    const optgroup = document.createElement('optgroup');
+                    optgroup.label = category;
+                    
+                    models.forEach(model => {
+                        const option = document.createElement('option');
+                        option.value = model.key;
+                        option.textContent = model.name + (model.available ? '' : ' (不可用)');
+                        option.disabled = !model.available;
+                        optgroup.appendChild(option);
+                    });
+                    
+                    modelSelect.appendChild(optgroup);
+                }
+                
+                // 默认选择第一个可用的 BLIP 微调模型，否则选 SCST 模型
+                const blipFinetuned = data.models.find(m => m.key === 'blip_finetuned' && m.available);
+                const scstModel = data.models.find(m => m.key.includes('scst') && m.available);
+                if (blipFinetuned) {
+                    modelSelect.value = blipFinetuned.key;
+                } else if (scstModel) {
+                    modelSelect.value = scstModel.key;
+                }
+            } catch (error) {
+                modelSelect.innerHTML = '<option value="">加载失败</option>';
+                showError('无法加载模型列表，请确保后端服务已启动');
+            }
+        }
+
+        // 加载设备信息
+        async function loadDeviceInfo() {
+            try {
+                const response = await fetch('/api/device');
+                const data = await response.json();
+                deviceBadge.textContent = data.cuda_available 
+                    ? `GPU (${data.cuda_device_name})` 
+                    : 'CPU';
+            } catch (error) {
+                deviceBadge.textContent = '未知';
+            }
+        }
+
+        // 解码方式选择
+        methodOptions.forEach(option => {
+            option.addEventListener('click', () => {
+                methodOptions.forEach(o => o.classList.remove('active'));
+                option.classList.add('active');
+                selectedMethod = option.dataset.method;
+            });
+        });
+
+        // 上传区域点击
+        uploadArea.addEventListener('click', () => fileInput.click());
+
+        // 拖拽效果
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.classList.add('dragover');
+        });
+
+        uploadArea.addEventListener('dragleave', () => {
+            uploadArea.classList.remove('dragover');
+        });
+
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('dragover');
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                handleFile(files[0]);
+            }
+        });
+
+        // 文件选择
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                handleFile(e.target.files[0]);
+            }
+        });
+
+        // 处理文件
+        function handleFile(file) {
+            if (!file.type.startsWith('image/')) {
+                showError('请选择图片文件');
+                return;
+            }
+
+            selectedFile = file;
+            
+            // 显示预览
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                previewImage.src = e.target.result;
+                previewContainer.classList.add('show');
+            };
+            reader.readAsDataURL(file);
+
+            // 启用生成按钮
+            generateBtn.disabled = false;
+            
+            // 隐藏之前的结果和错误
+            resultContainer.classList.remove('show');
+            hideError();
+        }
+
+        // 生成描述
+        generateBtn.addEventListener('click', async () => {
+            if (!selectedFile) {
+                showError('请先选择图片');
+                return;
+            }
+
+            const model = modelSelect.value;
+            if (!model) {
+                showError('请选择模型');
+                return;
+            }
+
+            // 显示加载状态
+            generateBtn.classList.add('loading');
+            generateBtn.disabled = true;
+            hideError();
+            resultContainer.classList.remove('show');
+
+            try {
+                const formData = new FormData();
+                formData.append('image', selectedFile);
+                formData.append('model', model);
+                formData.append('method', selectedMethod);
+                formData.append('beam_size', 5);
+
+                const response = await fetch('/api/generate', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+
+                if (data.error) {
+                    showError(data.error);
+                } else {
+                    resultCaption.textContent = data.caption;
+                    resultMeta.textContent = `模型: ${data.model} | 解码: ${data.method}`;
+                    resultContainer.classList.add('show');
+                }
+            } catch (error) {
+                showError('请求失败，请检查后端服务是否运行');
+            } finally {
+                generateBtn.classList.remove('loading');
+                generateBtn.disabled = false;
+            }
+        });
+
+        // 显示错误
+        function showError(message) {
+            errorMessage.textContent = message;
+            errorMessage.classList.add('show');
+        }
+
+        // 隐藏错误
+        function hideError() {
+            errorMessage.classList.remove('show');
+        }
+
+        // 启动
+        init();
+    </script>
+</body>
+</html>
