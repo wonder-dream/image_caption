@@ -6,8 +6,6 @@
   <component name="ChangeListManager">
     <list default="true" id="5d69e8d3-0a43-4d07-bc6e-b43fed71b3c3" name="更改" comment="修改md">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/实验报告.md" beforeDir="false" afterPath="$PROJECT_DIR$/实验报告.md" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/模型完成总结.md" beforeDir="false" afterPath="$PROJECT_DIR$/模型完成总结.md" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -17,18 +15,18 @@
   <component name="Git.Settings">
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
   </component>
-  <component name="GitHubPullRequestSearchHistory"><![CDATA[{
-  "lastFilter": {
-    "state": "OPEN",
-    "assignee": "GangCn"
+  <component name="GitHubPullRequestSearchHistory">{
+  &quot;lastFilter&quot;: {
+    &quot;state&quot;: &quot;OPEN&quot;,
+    &quot;assignee&quot;: &quot;GangCn&quot;
   }
-}]]></component>
-  <component name="GithubPullRequestsUISettings"><![CDATA[{
-  "selectedUrlAndAccountId": {
-    "url": "https://github.com/wonder-dream/image_caption.git",
-    "accountId": "18837cba-d22a-412e-bf5f-acb2f5b3702a"
+}</component>
+  <component name="GithubPullRequestsUISettings">{
+  &quot;selectedUrlAndAccountId&quot;: {
+    &quot;url&quot;: &quot;https://github.com/wonder-dream/image_caption.git&quot;,
+    &quot;accountId&quot;: &quot;18837cba-d22a-412e-bf5f-acb2f5b3702a&quot;
   }
-}]]></component>
+}</component>
   <component name="ProjectColorInfo">{
   &quot;associatedIndex&quot;: 4
 }</component>
@@ -65,6 +63,7 @@
       <recent name="C:\Users\11948\PyCharmMiscProject\image_caption\template" />
     </key>
     <key name="MoveFile.RECENT_KEYS">
+      <recent name="C:\Users\11948\PyCharmMiscProject\image_caption" />
       <recent name="D:\image_caption\checkpoints\vit_transformer" />
     </key>
   </component>
@@ -142,7 +141,15 @@
       <option name="project" value="LOCAL" />
       <updated>1768116274976</updated>
     </task>
-    <option name="localTasksCounter" value="2" />
+    <task id="LOCAL-00002" summary="修改md">
+      <option name="closed" value="true" />
+      <created>1768117599567</created>
+      <option name="number" value="00002" />
+      <option name="presentableId" value="LOCAL-00002" />
+      <option name="project" value="LOCAL" />
+      <updated>1768117599567</updated>
+    </task>
+    <option name="localTasksCounter" value="3" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
