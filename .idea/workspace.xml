@@ -6,6 +6,7 @@
   <component name="ChangeListManager">
     <list default="true" id="5d69e8d3-0a43-4d07-bc6e-b43fed71b3c3" name="更改" comment="修改md">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/实验报告.md" beforeDir="false" afterPath="$PROJECT_DIR$/实验报告.md" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -149,7 +150,23 @@
       <option name="project" value="LOCAL" />
       <updated>1768117599567</updated>
     </task>
-    <option name="localTasksCounter" value="3" />
+    <task id="LOCAL-00003" summary="修改md">
+      <option name="closed" value="true" />
+      <created>1768118026513</created>
+      <option name="number" value="00003" />
+      <option name="presentableId" value="LOCAL-00003" />
+      <option name="project" value="LOCAL" />
+      <updated>1768118026513</updated>
+    </task>
+    <task id="LOCAL-00004" summary="修改md">
+      <option name="closed" value="true" />
+      <created>1768118072272</created>
+      <option name="number" value="00004" />
+      <option name="presentableId" value="LOCAL-00004" />
+      <option name="project" value="LOCAL" />
+      <updated>1768118072272</updated>
+    </task>
+    <option name="localTasksCounter" value="5" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
